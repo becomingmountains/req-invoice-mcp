@@ -1,0 +1,81 @@
+---
+title: Quickstart
+description: Install req-invoice-mcp and send your first payment link.
+---
+
+import { Steps, Tabs, TabItem, Aside } from '@astrojs/starlight/components';
+
+You need **Node.js 20+** and a wallet to receive payments.
+
+<Steps>
+
+1. **Get free credentials**
+
+   Sign in at [dashboard.request.network](https://dashboard.request.network) with your wallet and set up a **receiving route**: the network, wallet and token you want to be paid in.
+
+   On the route, open **Manage → Client IDs → Generate**. Copy the **Client ID** and the route's **Route ID**:
+
+   ```txt
+   0xYourWallet@eip155:1#ABCD1234:0xTokenAddress
+   ```
+
+2. **Add the server to your assistant**
+
+   <Tabs>
+     <TabItem label="Cursor">
+       Add to `~/.cursor/mcp.json` (or `.cursor/mcp.json` in a project):
+       ```json
+       {
+         "mcpServers": {
+           "req-invoice": {
+             "command": "npx",
+             "args": ["-y", "github:becomingmountains/req-invoice-mcp"],
+             "env": {
+               "REQUEST_CLIENT_ID": "your-client-id",
+               "REQUEST_ORIGIN": "https://your-allowed-domain.example",
+               "REQUEST_DESTINATION_ID": "0xYourWallet@eip155:1#ABCD1234:0xTokenAddress",
+               "REQUEST_PAYEE": "0xYourWallet"
+             }
+           }
+         }
+       }
+       ```
+     </TabItem>
+     <TabItem label="VS Code">
+       Add to `.vscode/mcp.json`:
+       ```json
+       {
+         "servers": {
+           "req-invoice": {
+             "type": "stdio",
+             "command": "npx",
+             "args": ["-y", "github:becomingmountains/req-invoice-mcp"],
+             "env": {
+               "REQUEST_CLIENT_ID": "your-client-id",
+               "REQUEST_ORIGIN": "https://your-allowed-domain.example",
+               "REQUEST_DESTINATION_ID": "0xYourWallet@eip155:1#ABCD1234:0xTokenAddress",
+               "REQUEST_PAYEE": "0xYourWallet"
+             }
+           }
+         }
+       }
+       ```
+     </TabItem>
+     <TabItem label="Other clients">
+       Any MCP client that runs stdio servers works. Use the command
+       `npx -y github:becomingmountains/req-invoice-mcp` and set the environment variables from
+       [Configuration](/req-invoice-mcp/reference/configuration/).
+     </TabItem>
+   </Tabs>
+
+3. **Send your first link**
+
+   Restart your assistant and ask:
+
+   > Create a payment link for 25 USDC.
+
+   You'll get back a `secure.request.network` link and an invoice ID. Later, ask "has it been paid?"
+
+</Steps>
+
+<Aside type="tip">Try it with test money first: [Test on Sepolia](/req-invoice-mcp/guides/sepolia/).</Aside>

@@ -1,0 +1,73 @@
+---
+title: Tools
+description: Every tool, its inputs and what it returns.
+---
+
+import { Badge } from '@astrojs/starlight/components';
+
+Every tool returns a readable summary followed by the raw API response as JSON. Invalid input is rejected before any network call.
+
+## create_payment_link
+
+<Badge text="creates" variant="success" /> Bills someone and returns a hosted payment link. Requires `REQUEST_DESTINATION_ID`.
+
+| Input | Type | Required | Notes |
+|---|---|---|---|
+| `amount` | string | yes | Plain decimal in the route's token, e.g. `"250"`. |
+
+**Returns** `securePaymentUrl`, `requestIds`, `token`.
+
+## create_invoice
+
+<Badge text="creates" variant="success" /> Creates an invoice with a chosen token, network and denomination.
+
+| Input | Type | Required | Notes |
+|---|---|---|---|
+| `amount` | string | yes | Plain decimal, e.g. `"19.99"`. |
+| `paymentCurrency` | string | yes | e.g. `USDC-base`, `ETH-sepolia-sepolia`. |
+| `invoiceCurrency` | string | no | Defaults to `paymentCurrency`. Use `USD` to bill dollars. |
+| `payee` | address | no | Defaults to `REQUEST_PAYEE`. |
+| `payer` | address | no | Expected payer. |
+| `reference` | string | no | Your note or invoice number, up to 200 characters. |
+
+**Returns** `requestId`, `paymentReference`.
+
+## check_invoice
+
+<Badge text="read-only" /> Whether an invoice is paid, with payments and transaction hashes.
+
+| Input | Type | Required |
+|---|---|---|
+| `requestId` | hex string | yes |
+
+**Returns** `hasBeenPaid`, `status`, `requestAmount`, `invoiceCurrency`, `paymentCurrency`, `payments[]`, `txHash` and more.
+
+## list_invoices
+
+<Badge text="read-only" /> Invoices created with your credentials, newest first.
+
+| Input | Type | Required | Notes |
+|---|---|---|---|
+| `walletAddress` | address | no | Only invoices paid to this wallet. |
+| `limit` | 1–100 | no | Default 20. |
+| `offset` | integer | no | For paging. |
+
+## get_payment_transactions
+
+<Badge text="read-only" /> The unsigned transactions a payer signs to pay an invoice.
+
+| Input | Type | Required | Notes |
+|---|---|---|---|
+| `requestId` | hex string | yes | |
+| `payerWallet` | address | no | Enables balance, gas and approval checks. |
+
+**Returns** `transactions[]` (`to`, `data`, `value`) and `metadata` (`needsApproval`, `approvalTransactionIndex`, `hasEnoughBalance`, `hasEnoughGas`).
+
+## find_currency
+
+<Badge text="read-only" /> Looks up currency IDs.
+
+| Input | Type | Required |
+|---|---|---|
+| `symbol` | string | one of these |
+| `network` | string | one of these |

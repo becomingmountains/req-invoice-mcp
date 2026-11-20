@@ -1,0 +1,39 @@
+---
+title: Crypto invoices for AI assistants
+description: Let any MCP-capable assistant create, share and track crypto invoices on Request Network. No wallet, can't spend.
+template: splash
+hero:
+  tagline: Your assistant can already pay for an API call. Now it can send a bill. Create invoices, share payment links and check who's paid, in plain language.
+  actions:
+    - text: Quickstart
+      link: /req-invoice-mcp/quickstart/
+      icon: right-arrow
+    - text: View on GitHub
+      link: https://github.com/becomingmountains/req-invoice-mcp
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+<CardGrid>
+  <Card title="Get paid with a link" icon="rocket">
+    "Bill Acme 500 USDC for the website." Your assistant replies with a link Acme opens to pay from their own wallet.
+  </Card>
+  <Card title="Know when it lands" icon="approve-check">
+    "Has Acme paid?" The assistant checks the invoice and shows the transaction. On-chain references mean no matching by hand.
+  </Card>
+  <Card title="Can't spend a cent" icon="seti:lock">
+    No private keys, no signing, no sending. The server creates and reads invoices, nothing more.
+  </Card>
+  <Card title="Works where you work" icon="laptop">
+    Cursor, VS Code, Windsurf, desktop AI apps or your own agent: anything that speaks MCP.
+  </Card>
+</CardGrid>
+
+<CardGrid>
+  <LinkCard title="Quickstart" description="Running in about two minutes." href="/req-invoice-mcp/quickstart/" />
+  <LinkCard title="Tool reference" description="All six tools, their inputs and what they return." href="/req-invoice-mcp/reference/tools/" />
+</CardGrid>
+
+<p class="unofficial">Unofficial community project. Not affiliated with or endorsed by Request Network.</p>

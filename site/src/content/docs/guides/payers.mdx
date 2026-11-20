@@ -1,0 +1,30 @@
+---
+title: For payers
+description: How invoices get paid, by people and by agents.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Paying never goes through this server. There are two ways to pay.
+
+## Open the link
+
+Most payers open the payment link, connect any browser wallet and confirm.
+
+## Pay programmatically
+
+An agent with its own wallet can ask for the transactions:
+
+> What do I need to sign to pay invoice 01e273ec… from 0x9c…e1?
+
+`get_payment_transactions` returns, in order:
+
+1. A token **approval**, if the payment contract can't spend the token yet.
+2. The **payment** itself, carrying the invoice's payment reference.
+
+It also flags insufficient balance or gas. The agent's own wallet tooling signs and sends them.
+
+<Aside type="caution" title="Automating payments">
+  Use a separate wallet holding only a small budget, never your main wallet, and enforce spending
+  limits in whatever signs the transactions. Always check the recipient and amount before signing.
+</Aside>

@@ -1,0 +1,35 @@
+---
+title: How it works
+description: What happens between "bill Acme" and "Acme paid".
+---
+
+import { Steps } from '@astrojs/starlight/components';
+
+```txt
+ You ──"bill Acme 500 USDC"──▶ Assistant ──MCP──▶ req-invoice-mcp ──HTTPS──▶ Request Network API
+                                                                                   │
+ Acme ◀──────────────────── payment link ◀─────────────────────────────────────────┘
+   │
+   └── pays from own wallet ──▶ Request payment contract ──▶ your wallet (+ payment reference on-chain)
+```
+
+<Steps>
+
+1. **You ask** your assistant to bill someone.
+2. **The server calls the Request Network API**, which creates the invoice (a *request*) with a unique **payment reference**, and returns a hosted payment link.
+3. **The payer opens the link** and pays from their own wallet. The payment goes through Request Network's payment contracts, which record the reference on-chain next to the transfer.
+4. **You ask "did they pay?"** and the server reads the invoice status. Because the reference is on-chain, the payment is matched to the invoice automatically.
+
+</Steps>
+
+## What the server is
+
+- A small Node.js program your assistant launches locally over stdio.
+- Six tools, each a thin, validated wrapper around one Request Network API call.
+- Stateless: no database, no stored keys. Settings come from environment variables.
+
+## What it isn't
+
+- Not a wallet. It can't sign or send anything.
+- Not a custodian. Money moves straight from payer to payee.
+- Not affiliated with Request Network. It uses their public API.

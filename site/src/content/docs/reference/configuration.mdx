@@ -1,0 +1,17 @@
+---
+title: Configuration
+description: Environment variables.
+---
+
+All settings are environment variables, set in your MCP client's config. The server stores nothing.
+
+| Variable | Required | Description |
+|---|---|---|
+| `REQUEST_CLIENT_ID` | this or `REQUEST_API_KEY` | Client ID from the dashboard (route → Manage → Client IDs). |
+| `REQUEST_API_KEY` | this or `REQUEST_CLIENT_ID` | Server-side API key. Takes priority over the Client ID if both are set. |
+| `REQUEST_ORIGIN` | with a Client ID | Origin matching the Client ID's allowed domain. The API checks it. |
+| `REQUEST_DESTINATION_ID` | for `create_payment_link` | Your dashboard Route ID. |
+| `REQUEST_PAYEE` | for `create_invoice` with an API key | Default wallet that gets paid (`0x…` or Tron `T…`). |
+| `REQUEST_API_URL` | no | API base URL. Default `https://api.request.network`. Must be HTTPS. |
+
+The server checks settings at startup and exits with a clear message if something's missing or malformed.

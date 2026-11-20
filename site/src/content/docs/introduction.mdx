@@ -1,0 +1,39 @@
+---
+title: Introduction
+description: What req-invoice-mcp is and what it can do.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+**req-invoice-mcp** is an [MCP](https://modelcontextprotocol.io) server that connects AI assistants to [Request Network](https://request.network), a payment protocol that has settled on-chain invoices since 2017.
+
+Once it's installed, you can say:
+
+> "Bill Acme 500 USDC for the website."
+>
+> "Who still owes me money?"
+>
+> "Has invoice INV-042 been paid?"
+
+and your assistant handles it.
+
+## What you can do
+
+| You say | The assistant uses |
+|---|---|
+| "Send me a payment link for 250 USDC" | [`create_payment_link`](/req-invoice-mcp/reference/tools/#create_payment_link) |
+| "Invoice 0xAb… $1,200 in USDC on Base" | [`create_invoice`](/req-invoice-mcp/reference/tools/#create_invoice) |
+| "Has Acme paid?" | [`check_invoice`](/req-invoice-mcp/reference/tools/#check_invoice) |
+| "Who still owes me?" | [`list_invoices`](/req-invoice-mcp/reference/tools/#list_invoices) |
+| "What do I sign to pay this invoice?" | [`get_payment_transactions`](/req-invoice-mcp/reference/tools/#get_payment_transactions) |
+| "Currency ID for USDC on Arbitrum?" | [`find_currency`](/req-invoice-mcp/reference/tools/#find_currency) |
+
+## Why invoices?
+
+Agent payment protocols like x402 handle instant, pay-per-request payments. Real work also runs on **bills**: someone is charged now and pays later, and the payment has to be tied back to the bill. That's what Request Network does, and this server puts it in your assistant's hands.
+
+<Aside type="tip" title="No wallet needed">
+  You only give the server the address that **receives** money. It never holds a key and can't send funds. See [Security](/req-invoice-mcp/security/).
+</Aside>
+
+<Aside type="note">Unofficial community project. Not affiliated with or endorsed by Request Network.</Aside>

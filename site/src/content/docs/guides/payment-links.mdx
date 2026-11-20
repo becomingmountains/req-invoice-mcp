@@ -1,0 +1,35 @@
+---
+title: Get paid with a link
+description: The simplest way to bill someone.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+A payment link is a hosted page where the payer connects their wallet and pays. You don't need their address in advance.
+
+## Setup
+
+Set `REQUEST_DESTINATION_ID` to your dashboard **Route ID**. The route decides the **network**, the **token** and the **wallet** that gets paid.
+
+## Use it
+
+> Send me a payment link for 250 USDC for the logo work.
+
+The assistant calls `create_payment_link` and replies with:
+
+```txt
+Payment link created for 250. Send this to the payer:
+https://secure.request.network/01J…
+Invoice ID: 01e273ec… (use check_invoice to see when it's paid).
+```
+
+Send the link however you like: email, chat or a QR code.
+
+## Check payment
+
+> Has the logo invoice been paid?
+
+<Aside>
+  The amount is in your route's token. For a different token or network, set up another route
+  or use [custom invoices](/req-invoice-mcp/guides/custom-invoices/).
+</Aside>

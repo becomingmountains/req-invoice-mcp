@@ -1,0 +1,43 @@
+---
+title: Custom invoices
+description: Choose the token, network, payee and denomination per invoice.
+---
+
+`create_invoice` gives full control over each invoice.
+
+## Pick token and network
+
+`paymentCurrency` is a Request Network currency ID in the form `SYMBOL-network`:
+
+| Currency ID | Meaning |
+|---|---|
+| `USDC-mainnet` | USDC on Ethereum |
+| `USDC-base` | USDC on Base |
+| `USDC-matic` | USDC on Polygon |
+| `ETH-sepolia-sepolia` | Test ETH on Sepolia |
+
+Not sure? Ask "what's the currency ID for USDT on Arbitrum?" and the assistant uses `find_currency`.
+
+## Bill in dollars, get paid in crypto
+
+Set `invoiceCurrency` to `USD`:
+
+> Invoice 0xAb…12 $1,200 for March consulting, paid in USDC on Base, reference INV-042.
+
+```json
+{
+  "amount": "1200",
+  "invoiceCurrency": "USD",
+  "paymentCurrency": "USDC-base",
+  "payee": "0xYourWallet",
+  "reference": "INV-042"
+}
+```
+
+## Who gets paid
+
+`payee` defaults to `REQUEST_PAYEE`. With a Client ID and no payee, the route's wallet is used.
+
+## Paying a custom invoice
+
+The payer uses [`get_payment_transactions`](/req-invoice-mcp/guides/payers/) or any Request-compatible app with the invoice ID.

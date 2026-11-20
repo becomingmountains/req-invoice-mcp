@@ -1,0 +1,19 @@
+---
+title: Test on Sepolia
+description: Run the whole flow with test money.
+---
+
+import { Steps, Aside } from '@astrojs/starlight/components';
+
+<Steps>
+
+1. **Make a fresh test wallet.** Every address you use is public on-chain, so keep your main wallet out of demos.
+2. **Create a Sepolia route** in [dashboard.request.network](https://dashboard.request.network) and copy its Route ID and a Client ID.
+3. **Get test funds.** Get Sepolia ETH for gas from any Sepolia faucet, and test USDC from [faucet.circle.com](https://faucet.circle.com). Send them to a *second* test wallet that will act as the payer.
+4. **Create a link:** "Create a payment link for 1 USDC."
+5. **Pay it** from the second wallet.
+6. **Check it:** "Has it been paid?" You should see PAID and the transaction hash.
+
+</Steps>
+
+<Aside>Prefer per-invoice control? Use `create_invoice` with `paymentCurrency: "ETH-sepolia-sepolia"`.</Aside>

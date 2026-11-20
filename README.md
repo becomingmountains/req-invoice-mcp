@@ -9,7 +9,7 @@ An [MCP](https://modelcontextprotocol.io) server for [Request Network](https://r
 
 **It holds no wallet and can't spend money.** It creates and reads invoices only. Payers pay from their own wallet.
 
-📖 **Docs:** https://becomingmountains.github.io/req-invoice-mcp/
+📖 **Docs:** https://becomingmountains.github.io/req-invoice-mcp/ (source in [`site/`](site/))
 
 > Unofficial community project. Not affiliated with or endorsed by Request Network.
 

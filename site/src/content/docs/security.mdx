@@ -1,0 +1,33 @@
+---
+title: Security
+description: Why the server can't move money, and other safeguards.
+---
+
+## Can't move funds
+
+The server has **no private keys** and makes **no blockchain transactions**. Its tools create invoices and read data through the Request Network API. A receive-only address can't be drained, so the worst a misbehaving assistant can do is create unwanted invoices.
+
+## Strict input validation
+
+Before any network call, every input is validated:
+
+- **Amounts:** plain positive decimals only. `0`, negatives, exponents and commas are rejected.
+- **Addresses:** `0x` + 40 hex characters, or a Tron `T…` address.
+- **Invoice IDs:** hex only, so a manipulated model can't steer requests to other API paths.
+- **Currency IDs and references:** limited character sets and lengths.
+
+## Credentials
+
+Keys live in your MCP client config. They're sent only to the Request Network API over HTTPS and never appear in tool output or error messages. A non-HTTPS API URL is refused.
+
+## Clear tool labels
+
+Read-only tools are marked read-only, so MCP clients can auto-approve them while asking before anything that creates an invoice.
+
+## Tested
+
+Every tool is covered by tests, including bad inputs, path-injection attempts, API failures and credential leaks. They run on every commit.
+
+## Report a problem
+
+Open a [GitHub issue](https://github.com/becomingmountains/req-invoice-mcp/issues). For anything sensitive, use GitHub's private vulnerability reporting on the repository.
