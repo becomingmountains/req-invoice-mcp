@@ -29,7 +29,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
       baseUrl,
       apiKey,
       clientId,
-      // Client ID auth requires an Origin header that matches the client ID's allowed domains.
+      // Optional Origin header, for Client IDs restricted to specific domains.
       origin: clean(env.REQUEST_ORIGIN),
     },
     defaultPayee,

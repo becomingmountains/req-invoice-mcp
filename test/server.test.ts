@@ -284,6 +284,35 @@ describe('get_payment_transactions', () => {
   });
 });
 
+describe('unlimited approval warning', () => {
+  const spender = '399f5ee127ce7432e4921a61b8cf52b0af52cbfe';
+  const approve = (amountHex: string) => `0x095ea7b3${spender.padStart(64, '0')}${amountHex.padStart(64, '0')}`;
+
+  it('warns on a max-uint approval, as returned by the live API', async () => {
+    const { call } = await connect({
+      [`GET /v2/request/${REQ_ID}/pay`]: [
+        200,
+        {
+          transactions: [
+            { to: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', data: approve('f'.repeat(64)), value: 0 },
+            { to: '0x399F5EE127ce7432E4921a61b8CF52b0af52cbfE', data: '0xc219a14d', value: 0 },
+          ],
+          metadata: { stepsRequired: 2, needsApproval: true, approvalTransactionIndex: 0, hasEnoughBalance: true, hasEnoughGas: true },
+        },
+      ],
+    });
+    const res = await call('get_payment_transactions', { requestId: REQ_ID });
+    expect(res.text).toContain(`transaction 1 approves an UNLIMITED amount to 0x${spender}`);
+  });
+
+  it('stays quiet for an exact approval or other calls', async () => {
+    const { unlimitedApprovalWarning } = await import('../src/server.js');
+    expect(unlimitedApprovalWarning(approve('7a120'), 0)).toBe('');
+    expect(unlimitedApprovalWarning('0xc219a14d00', 1)).toBe('');
+    expect(unlimitedApprovalWarning('', 0)).toBe('');
+  });
+});
+
 describe('find_currency', () => {
   it('looks up currency IDs', async () => {
     const { call, calls } = await connect({

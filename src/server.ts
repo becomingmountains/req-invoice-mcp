@@ -28,7 +28,7 @@ const requestId = z
 const currencyId = z
   .string()
   .trim()
-  .regex(/^[A-Za-z0-9._-]{2,64}$/, 'Currency IDs look like "USDC-base", "ETH-sepolia-sepolia" or "USD"');
+  .regex(/^[A-Za-z0-9._-]{2,64}$/, 'Currency IDs look like "USDC-base", "USDC-mainnet", "fUSDC-sepolia" or "USD"');
 
 const reference = z.string().trim().max(200);
 
@@ -69,7 +69,7 @@ export function createServer(config: ServerConfig, api: RequestApi): McpServer {
       title: 'Create an invoice',
       description:
         'Create an on-chain invoice (a "request") for a specific amount, currency and network. ' +
-        'paymentCurrency picks the token and network, e.g. "USDC-base", "USDC-mainnet", "ETH-sepolia-sepolia" ' +
+        'paymentCurrency picks the token and network, e.g. "USDC-base", "USDC-mainnet", "USDC-arbitrum-one", "fUSDC-sepolia" (test USDC) ' +
         '(use find_currency to look IDs up). invoiceCurrency is what the amount is denominated in; it defaults to ' +
         'paymentCurrency, or use "USD" to bill a dollar amount paid in crypto. Returns the invoice ID.',
       inputSchema: {
@@ -166,6 +166,7 @@ export function createServer(config: ServerConfig, api: RequestApi): McpServer {
         const notes = [
           `${calldata.transactions.length} transaction(s) to sign, in order.`,
           m.needsApproval ? `Transaction ${Number(m.approvalTransactionIndex ?? 0) + 1} is a token approval.` : '',
+          ...calldata.transactions.map((tx, i) => unlimitedApprovalWarning(tx.data, i)),
           m.hasEnoughBalance === false ? 'Warning: the payer wallet does not have enough balance.' : '',
           m.hasEnoughGas === false ? 'Warning: the payer wallet does not have enough gas.' : '',
           'Unsigned: review and sign in your own wallet. This server cannot send them.',
@@ -217,6 +218,19 @@ export function describeStatus(s: RequestStatus): string {
   }
   if (!s.payments?.length && s.txHash) lines.push(`Payment tx: ${s.txHash}`);
   return lines.join('\n');
+}
+
+/** Flags ERC-20 approve(spender, amount) calls that grant the maximum possible allowance. */
+export function unlimitedApprovalWarning(data: string, index: number): string {
+  const m = /^0x095ea7b3([0-9a-fA-F]{64})([0-9a-fA-F]{64})$/.exec(data ?? '');
+  if (!m) return '';
+  const amount = BigInt('0x' + m[2]);
+  if (amount < 2n ** 128n) return '';
+  const spender = '0x' + m[1].slice(24);
+  return (
+    `Warning: transaction ${index + 1} approves an UNLIMITED amount to ${spender}. ` +
+    'Most wallets let you edit the approval down to the invoice amount before signing.'
+  );
 }
 
 function payerText(p: RequestPayment): string {
