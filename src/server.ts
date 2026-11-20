@@ -1,7 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { RequestApi, RequestApiError, type RequestStatus } from './api.js';
+import { RequestApi, RequestApiError, type RequestPayment, type RequestStatus } from './api.js';
 import type { ServerConfig } from './config.js';
 
 export const VERSION = '0.1.0';
@@ -204,19 +204,25 @@ export function describeStatus(s: RequestStatus): string {
   const amountText = `${s.requestAmount ?? '?'} ${s.invoiceCurrency ?? ''}`.trim();
   const lines = [
     `Invoice ${s.requestId}: ${s.hasBeenPaid ? 'PAID' : 'NOT PAID YET'}${s.status ? ` (status: ${s.status})` : ''}.`,
-    `Amount: ${amountText}${s.paymentCurrency ? `, paid in ${s.paymentCurrency}` : ''}${s.amountInUsd ? ` (~$${s.amountInUsd})` : ''}.`,
+    `Amount: ${amountText}${s.paymentCurrency ? `, paid in ${s.paymentCurrency}` : ''}${Number(s.amountInUsd) > 0 ? ` (~$${s.amountInUsd})` : ''}.`,
   ];
   if (s.payee) lines.push(`Payee: ${s.payee}`);
   if (s.reference) lines.push(`Reference: ${s.reference}`);
   for (const p of s.payments ?? []) {
     lines.push(
       `Payment: ${p.amount ?? '?'}${p.paymentCurrency ? ` ${p.paymentCurrency}` : ''}` +
-        `${p.payerAddress ? ` from ${p.payerAddress}` : ''}${p.timestamp ? ` at ${p.timestamp}` : ''}` +
+        `${payerText(p)}${p.timestamp ? ` at ${p.timestamp}` : ''}` +
         `${p.sourceTxHash ? `, tx ${p.sourceTxHash}` : ''}`,
     );
   }
   if (!s.payments?.length && s.txHash) lines.push(`Payment tx: ${s.txHash}`);
   return lines.join('\n');
+}
+
+function payerText(p: RequestPayment): string {
+  if (!p.payerAddress) return '';
+  const eoa = p.payerEoaAddress?.toLowerCase() !== p.payerAddress.toLowerCase() ? p.payerEoaAddress : undefined;
+  return eoa ? ` from ${eoa} (via smart account ${p.payerAddress})` : ` from ${p.payerAddress}`;
 }
 
 function ok(text: string, data: unknown): CallToolResult {

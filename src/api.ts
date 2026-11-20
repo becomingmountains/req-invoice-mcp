@@ -38,6 +38,8 @@ export interface RequestPayment {
   sourceTxHash?: string;
   destinationTxHash?: string;
   payerAddress?: string;
+  /** Wallet behind a smart-account payer, when reported. */
+  payerEoaAddress?: string;
   timestamp?: string;
   paymentCurrency?: string;
 }
