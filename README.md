@@ -23,10 +23,11 @@ An [MCP](https://modelcontextprotocol.io) server for [Request Network](https://r
 |---|---|
 | `create_payment_link` | Bill someone and get a link they open to pay, in any of your currencies and networks. |
 | `list_routes` | The currencies and networks you can be paid in. |
-| `create_invoice` | Create an invoice in a specific token and network, or bill in USD and get paid in crypto. |
+| `create_invoice` | Create an invoice in a specific token and network, bill in USD, or repeat it monthly for retainers. |
+| `stop_recurring_invoice` | Stop (or resume) a repeating invoice. |
 | `check_invoice` | Paid or not, with the payment transaction. Ask by name: "has Acme paid?" |
 | `get_payment_link` | The saved link for an invoice, so you can send it again. |
-| `list_invoices` | Everything you've billed, paid and unpaid. |
+| `list_invoices` | Who owes you what, with exact totals. Filters: unpaid, this month, older than 2 weeks, by name. |
 | `get_payment_transactions` | For payers: the unsigned transactions to pay an invoice in their own wallet. |
 | `find_currency` | Look up currency IDs like `USDC-base` or `fUSDC-sepolia`. |
 

@@ -68,7 +68,7 @@ async function connect(routes: Record<string, [number, unknown]>, overrides: Par
 }
 
 describe('tool list', () => {
-  it('exposes exactly the eight tools, and none of them can spend money', async () => {
+  it('exposes exactly the nine tools, and none of them can spend money', async () => {
     const { client } = await connect({});
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
@@ -80,6 +80,7 @@ describe('tool list', () => {
       'get_payment_transactions',
       'list_invoices',
       'list_routes',
+      'stop_recurring_invoice',
     ]);
     for (const t of tools) expect(t.annotations?.destructiveHint ?? false).toBe(false);
     const readOnly = tools.filter((t) => t.annotations?.readOnlyHint).map((t) => t.name).sort();
@@ -252,16 +253,20 @@ describe('list_invoices', () => {
             { requestId: 'aa', amount: '10', invoiceCurrency: 'USD', hasBeenPaid: true, reference: 'INV-1', createdAt: '2026-11-19T00:00:00Z' },
             { requestId: 'bb', amount: '20', invoiceCurrency: 'USD', hasBeenPaid: false },
           ],
-          pagination: { total: 5, limit: 2, offset: 0 },
+          pagination: { total: 2, limit: 100, offset: 0 },
         },
       ],
     });
-    const res = await call('list_invoices', { limit: 2, walletAddress: PAYEE });
-    expect(new URL(calls[0].url).searchParams.get('limit')).toBe('2');
+    const res = await call('list_invoices', { limit: 1, walletAddress: PAYEE });
+    expect(new URL(calls[0].url).searchParams.get('limit')).toBe('100');
     expect(new URL(calls[0].url).searchParams.get('walletAddress')).toBe(PAYEE);
-    expect(res.text).toContain('5 invoice(s), showing 1-2');
+    expect(res.text).toContain('2 invoice(s), showing 1-1');
+    expect(res.text).toContain("You're owed 20 USD across 1 invoice.");
+    expect(res.text).toContain('Paid: 10 USD across 1 invoice.');
+    expect(res.text).not.toContain('id bb');
+    const page2 = await call('list_invoices', { limit: 1, offset: 1 });
     expect(res.text).toMatch(/PAID\s+10 USD "INV-1" \(2026-11-19\) id aa/);
-    expect(res.text).toMatch(/UNPAID 20 USD id bb/);
+    expect(page2.text).toMatch(/UNPAID 20 USD id bb/);
   });
 });
 

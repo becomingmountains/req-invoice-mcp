@@ -40,6 +40,8 @@ With neither, the default (first) route is used. If more than one route matches,
 | `payer` | address | no | Expected payer. |
 | `reference` | string | no | Your note or invoice number, up to 200 characters. |
 | `for` | string | no | Who is billed. Saved locally. |
+| `repeat` | `daily` · `weekly` · `monthly` · `quarterly` · `yearly` | no | Bill again on this schedule. |
+| `startDate` | `YYYY-MM-DD` | no | First billing date for a repeating invoice; today or later, default today. |
 
 **Returns** `requestId`, `paymentReference`.
 
@@ -56,14 +58,27 @@ With neither, the default (first) route is used. If more than one route matches,
 
 ## list_invoices
 
-<Badge text="read-only" /> Invoices created with your credentials, newest first.
+<Badge text="read-only" /> Invoices created with your credentials, newest first, with exact totals owed and paid per currency.
 
 | Input | Type | Required | Notes |
 |---|---|---|---|
+| `status` | `unpaid` · `paid` · `all` | no | Default `all`. |
+| `period` | `this_month` · `last_month` · `last_30_days` · `this_year` | no | By creation date (UTC). |
+| `olderThanDays` | integer | no | e.g. `14` for "older than 2 weeks". |
 | `walletAddress` | address | no | Only invoices paid to this wallet. |
 | `who` | string | no | Only invoices saved with this name or note. |
-| `limit` | 1–100 | no | Default 20. |
+| `limit` | 1–100 | no | How many to show, default 20. Totals cover all matches. |
 | `offset` | integer | no | For paging. |
+
+## stop_recurring_invoice
+
+<Badge text="changes" variant="caution" /> Stops a repeating invoice, or restarts it with `resume: true`. Invoices already created are unchanged.
+
+| Input | Type | Required | Notes |
+|---|---|---|---|
+| `requestId` | hex string | one of these | |
+| `who` | string | one of these | If several recurring invoices match, it asks which one. |
+| `resume` | boolean | no | `true` restarts it. |
 
 ## get_payment_link
 

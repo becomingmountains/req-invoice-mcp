@@ -28,6 +28,7 @@ export default defineConfig({
           items: [
             { label: 'Get paid with a link', slug: 'guides/payment-links' },
             { label: 'Custom invoices', slug: 'guides/custom-invoices' },
+            { label: "Track what you're owed", slug: 'guides/tracking' },
             { label: 'For payers', slug: 'guides/payers' },
             { label: 'Test on Sepolia', slug: 'guides/sepolia' },
           ],

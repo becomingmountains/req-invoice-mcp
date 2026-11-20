@@ -45,6 +45,22 @@ Set `invoiceCurrency` to `USD`:
 Unlike payment links, custom invoices aren't tied to your route's network: a Client ID made on a Sepolia route created a
 USDC invoice on Base in our testing. Name the token and network in `paymentCurrency`.
 
+## Recurring billing
+
+For retainers and subscriptions:
+
+> Bill Acme 500 USDC on Base every month, starting December 1.
+
+`create_invoice` takes `repeat` (`daily`, `weekly`, `monthly`, `quarterly`, `yearly`) and an optional `startDate`
+(today or later; defaults to today). Request Network creates a new invoice each period; each one shows up in
+`list_invoices` and is paid on its own.
+
+> Stop billing Acme every month.
+
+`stop_recurring_invoice` stops it; invoices already created stay as they are. Say "resume" to restart it.
+
+Recurring billing works with custom invoices only; payment links are one-off.
+
 ## Paying a custom invoice
 
 The payer uses [`get_payment_transactions`](/req-invoice-mcp/guides/payers/) or any Request-compatible app with the invoice ID.

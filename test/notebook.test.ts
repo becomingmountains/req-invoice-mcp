@@ -130,7 +130,7 @@ describe('who each invoice is for', () => {
     expect(all.text).toMatch(/UNPAID 20 USDC for Bob "website"/);
     expect(all.text).toMatch(/PAID\s+30 USDC for Acme/);
     const bob = await call('list_invoices', { who: 'bob' });
-    expect(bob.text).toContain('1 invoice(s) for "bob"');
+    expect(bob.text).toContain('1 invoice(s) (for "bob")');
     expect(bob.text).not.toContain('for Acme');
   });
 

@@ -57,6 +57,9 @@ export interface RequestStatus {
   reference?: string;
   txHash?: string | null;
   payments?: RequestPayment[];
+  recurrence?: { startDate?: string; frequency?: string } | null;
+  isRecurrenceStopped?: boolean;
+  originalRequestId?: string | null;
 }
 
 export interface RequestListItem {
@@ -99,10 +102,13 @@ export interface Currency {
   type?: string;
 }
 
+export type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
+
 export interface CreateRequestInput {
   amount: string;
   invoiceCurrency: string;
   paymentCurrency: string;
+  recurrence?: { startDate: string; frequency: Frequency };
   payee?: string;
   payer?: string;
   reference?: string;
@@ -129,6 +135,11 @@ export class RequestApi {
     return this.send('POST', '/v2/secure-payments', { requests: [{ destinationId, amount }] });
   }
 
+  /** Stops (or resumes) a recurring invoice. */
+  setRecurrenceStopped(requestId: string, stopped: boolean): Promise<unknown> {
+    return this.send('PATCH', `/v2/request/${encodeURIComponent(requestId)}`, { isRecurrenceStopped: stopped });
+  }
+
   getRequest(requestId: string): Promise<RequestStatus> {
     return this.send('GET', `/v2/request/${encodeURIComponent(requestId)}`);
   }
@@ -146,7 +157,7 @@ export class RequestApi {
     return Array.isArray(result) ? result : [result];
   }
 
-  private async send<T>(method: 'GET' | 'POST', path: string, body?: unknown): Promise<T> {
+  private async send<T>(method: 'GET' | 'POST' | 'PATCH', path: string, body?: unknown): Promise<T> {
     const headers: Record<string, string> = { accept: 'application/json' };
     if (this.config.apiKey) headers['x-api-key'] = this.config.apiKey;
     else if (this.config.clientId) headers['x-client-id'] = this.config.clientId;

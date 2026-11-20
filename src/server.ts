@@ -5,15 +5,20 @@ import {
   RequestApi,
   RequestApiError,
   type FetchLike,
+  type Frequency,
   type RequestListItem,
   type RequestPayment,
   type RequestStatus,
 } from './api.js';
 import type { ServerConfig } from './config.js';
+import { applyFilters, describeTotals, totalsByCurrency } from './ledger.js';
 import { fileNotebook, memoryNotebook, type Notebook, type NotebookEntry } from './notebook.js';
 import { chooseRoute, networkLabel, type Route } from './routes.js';
 
-export const VERSION = '0.3.0';
+export const VERSION = '0.4.0';
+
+/** Most invoices list_invoices reads per Client ID, for totals and filters (5 API pages). */
+const LIST_CAP = 500;
 
 const address = z
   .string()
@@ -42,7 +47,12 @@ const currencyId = z
 const reference = z.string().trim().max(200);
 const who = z.string().trim().min(1).max(100);
 
-export function createServer(config: ServerConfig, fetchImpl?: FetchLike, notebookOverride?: Notebook): McpServer {
+export function createServer(
+  config: ServerConfig,
+  fetchImpl?: FetchLike,
+  notebookOverride?: Notebook,
+  now: () => Date = () => new Date(),
+): McpServer {
   const api = new RequestApi(config.api, fetchImpl);
   const notebook = notebookOverride ?? (config.notebookPath ? fileNotebook(config.notebookPath) : memoryNotebook());
   const remember = (entry: NotebookEntry) => {
@@ -197,7 +207,8 @@ export function createServer(config: ServerConfig, fetchImpl?: FetchLike, notebo
         'number or note. Creates an on-chain invoice (a "request") for a specific amount, currency and network. ' +
         'paymentCurrency picks the token and network, e.g. "USDC-base", "USDC-mainnet", "USDC-arbitrum-one", "fUSDC-sepolia" (test USDC) ' +
         '(use find_currency to look IDs up). invoiceCurrency is what the amount is denominated in; it defaults to ' +
-        'paymentCurrency, or use "USD" to bill a dollar amount paid in crypto. Returns the invoice ID.',
+        'paymentCurrency, or use "USD" to bill a dollar amount paid in crypto. Use repeat for recurring billing ' +
+        '("bill Acme 500 USDC every month"). Returns the invoice ID.',
       inputSchema: {
         amount,
         paymentCurrency: currencyId,
@@ -206,6 +217,15 @@ export function createServer(config: ServerConfig, fetchImpl?: FetchLike, notebo
         payer: address.optional().describe('Wallet expected to pay (optional).'),
         reference: reference.optional().describe('Your own note or invoice number, e.g. "INV-042 website".'),
         for: who.optional().describe('Who is being billed, e.g. "Acme". Saved locally for "has Acme paid?".'),
+        repeat: z
+          .enum(['daily', 'weekly', 'monthly', 'quarterly', 'yearly'])
+          .optional()
+          .describe('Bill again on this schedule, e.g. "monthly" for a retainer. Stop it with stop_recurring_invoice.'),
+        startDate: z
+          .string()
+          .regex(/^\d{4}-\d{2}-\d{2}$/, 'Use YYYY-MM-DD')
+          .optional()
+          .describe('First billing date for a repeating invoice (YYYY-MM-DD, today or later). Defaults to today.'),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
@@ -218,7 +238,14 @@ export function createServer(config: ServerConfig, fetchImpl?: FetchLike, notebo
         if (!payee && !config.api.clientId) {
           return fail('No payee: pass payee, or set REQUEST_PAYEE to the wallet that should receive payments.');
         }
+        if (args.startDate && !args.repeat) return fail('startDate is only for repeating invoices; add repeat (e.g. "monthly").');
+        const today = now().toISOString().slice(0, 10);
+        if (args.startDate && args.startDate < today) return fail(`startDate can't be in the past (today is ${today}).`);
+        const recurrence = args.repeat
+          ? { startDate: args.startDate ?? today, frequency: args.repeat.toUpperCase() as Frequency }
+          : undefined;
         const created = await apiFor(route).createRequest({
+          recurrence,
           amount: args.amount,
           invoiceCurrency: args.invoiceCurrency ?? args.paymentCurrency,
           paymentCurrency: args.paymentCurrency,
@@ -235,7 +262,8 @@ export function createServer(config: ServerConfig, fetchImpl?: FetchLike, notebo
           createdAt: new Date().toISOString(),
         });
         return ok(
-          `Invoice created${args.for ? ` for ${args.for}` : ''}: ${args.amount} ${args.invoiceCurrency ?? args.paymentCurrency}, paid in ${args.paymentCurrency}` +
+          `${recurrence ? `Recurring invoice created (${args.repeat}, starting ${recurrence.startDate})` : 'Invoice created'}` +
+            `${args.for ? ` for ${args.for}` : ''}: ${args.amount} ${args.invoiceCurrency ?? args.paymentCurrency}, paid in ${args.paymentCurrency}` +
             `${payee ? ` to ${payee}` : ''}.\nInvoice ID: ${created.requestId}\n` +
             'The payer can get the transactions to sign with get_payment_transactions. Use check_invoice to see when it is paid.',
           created,
@@ -283,13 +311,19 @@ export function createServer(config: ServerConfig, fetchImpl?: FetchLike, notebo
     {
       title: 'List invoices',
       description:
-        'Use when the user asks who owes them money, what is unpaid or outstanding, what they have billed, or for ' +
-        'their crypto invoices or receivables. Lists Request Network invoices created with these credentials, newest ' +
-        'first, marked PAID or UNPAID. Check this alongside any other billing tools (e.g. Stripe) the user has.',
+        'Use when the user asks who owes them money, what is unpaid or outstanding, how much they are owed or have ' +
+        'been paid, what they billed this month, or for their crypto invoices or receivables. Lists Request Network ' +
+        'invoices newest first, marked PAID or UNPAID, with exact totals per currency ("you are owed 1,250 USDC across ' +
+        '4 invoices"). Filter with status (unpaid/paid), period (this_month, last_month, last_30_days, this_year), ' +
+        'olderThanDays (e.g. 14 for "older than 2 weeks") and who. Check this alongside any other billing tools (e.g. ' +
+        'Stripe) the user has.',
       inputSchema: {
-        walletAddress: address.optional().describe('Only invoices paid to this wallet.'),
+        status: z.enum(['unpaid', 'paid', 'all']).optional().describe('Default "all".'),
+        period: z.enum(['this_month', 'last_month', 'last_30_days', 'this_year']).optional(),
+        olderThanDays: z.number().int().min(0).max(3650).optional().describe('Only invoices created at least this many days ago.'),
         who: who.optional().describe('Only invoices saved with this name or note, e.g. "Acme".'),
-        limit: z.number().int().min(1).max(100).optional(),
+        walletAddress: address.optional().describe('Only invoices paid to this wallet.'),
+        limit: z.number().int().min(1).max(100).optional().describe('How many to show (default 20). Totals cover all matches.'),
         offset: z.number().int().min(0).optional(),
       },
       annotations: { readOnlyHint: true, openWorldHint: true },
@@ -298,32 +332,86 @@ export function createServer(config: ServerConfig, fetchImpl?: FetchLike, notebo
       run(async () => {
         const limit = args.limit ?? 20;
         const offset = args.offset ?? 0;
-        const apis = allApis();
-        const list =
-          apis.length === 1
-            ? await api.listRequests({ walletAddress: args.walletAddress, limit, offset: args.offset })
-            : await mergeLists(apis, args.walletAddress, limit, offset);
-        let requests = list.requests.map((r) => ({ ...r, saved: notebook.get(r.requestId) }));
+        const { requests: all, capped } = await fetchAllInvoices(allApis(), args.walletAddress);
+        let matches = applyFilters(all, { status: args.status, period: args.period, olderThanDays: args.olderThanDays }, now()).map(
+          (r) => ({ ...r, saved: notebook.get(r.requestId) }),
+        );
         if (args.who) {
           const ids = new Set(notebook.search(args.who).map((e) => e.requestId));
-          requests = requests.filter((r) => ids.has(r.requestId));
+          matches = matches.filter((r) => ids.has(r.requestId));
         }
-        const lines = requests.map(
+        const unpaid = totalsByCurrency(matches.filter((r) => !r.hasBeenPaid));
+        const paid = totalsByCurrency(matches.filter((r) => r.hasBeenPaid));
+        const filters = [
+          args.status && args.status !== 'all' ? args.status : '',
+          args.period ? args.period.replace(/_/g, ' ') : '',
+          args.olderThanDays !== undefined ? `older than ${args.olderThanDays} days` : '',
+          args.who ? `for "${args.who}"` : '',
+        ].filter(Boolean);
+        const shown = matches.slice(offset, offset + limit);
+        const lines = shown.map(
           (r) =>
             `- ${r.hasBeenPaid ? 'PAID  ' : 'UNPAID'} ${r.amount ?? '?'} ${r.invoiceCurrency ?? ''}` +
             `${r.saved?.for ? ` for ${r.saved.for}` : ''}` +
             `${r.saved?.note ?? r.reference ? ` "${r.saved?.note ?? r.reference}"` : ''}` +
             `${r.createdAt ? ` (${r.createdAt.slice(0, 10)})` : ''} id ${r.requestId}`,
         );
-        if (args.who) {
-          return ok(
-            lines.length ? `${lines.length} invoice(s) for "${args.who}" in the latest ${list.requests.length}:\n${lines.join('\n')}` : `No invoices for "${args.who}" in the latest ${list.requests.length}.`,
-            { ...list, requests },
+        const summary = [
+          `${matches.length} invoice(s)${filters.length ? ` (${filters.join(', ')})` : ''}` +
+            `${matches.length > shown.length && shown.length ? `, showing ${offset + 1}-${offset + shown.length}` : ''}.`,
+          unpaid.totals.length ? `You're owed ${describeTotals(unpaid.totals)}.` : matches.length ? 'Nothing unpaid.' : '',
+          paid.totals.length && args.status !== 'unpaid' ? `Paid: ${describeTotals(paid.totals)}.` : '',
+          capped ? `Only the latest ${LIST_CAP} invoices per account were read.` : '',
+        ].filter(Boolean);
+        return ok([...summary, ...lines].join('\n'), {
+          total: matches.length,
+          owed: unpaid.totals,
+          paid: paid.totals,
+          requests: shown,
+        });
+      }),
+  );
+
+  server.registerTool(
+    'stop_recurring_invoice',
+    {
+      title: 'Stop or resume a recurring invoice',
+      description:
+        'Use when the user wants to stop (cancel, pause, end) or restart a repeating invoice, e.g. "stop billing Acme ' +
+        'every month". Pass the invoice ID or `who`. Set resume to true to restart it. Invoices already sent stay as they are.',
+      inputSchema: {
+        requestId: requestId.optional(),
+        who: who.optional().describe('Name the recurring invoice was created with, e.g. "Acme".'),
+        resume: z.boolean().optional().describe('true restarts a stopped recurring invoice.'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async (args) =>
+      run(async () => {
+        let ids: string[];
+        if (args.requestId) ids = [args.requestId];
+        else if (args.who) ids = notebook.search(args.who).map((e) => e.requestId);
+        else return fail('Pass an invoice ID, or who it was for (e.g. "Acme").');
+        if (!ids.length) return fail(`No saved invoices for "${args.who}". Use list_invoices to find the invoice ID.`);
+
+        // Only touch invoices that actually repeat; with a name, refuse to guess between several.
+        const statuses = await Promise.all(ids.slice(0, 10).map((id) => findAcrossApis((a) => a.getRequest(id))));
+        const recurring = statuses.filter((st) => st.recurrence && st.recurrence.frequency);
+        if (!recurring.length) return fail(`${args.requestId ? 'That invoice' : `No invoice for "${args.who}"`} isn't recurring.`);
+        if (recurring.length > 1) {
+          return fail(
+            `Several recurring invoices match "${args.who}"; pass one requestId:\n` +
+              recurring.map((st) => `- ${st.requestId}: ${st.requestAmount} ${st.invoiceCurrency} ${st.recurrence?.frequency?.toLowerCase()}`).join('\n'),
           );
         }
-        const { total } = list.pagination;
-        const header = `${total} invoice(s)${total > lines.length ? `, showing ${offset + 1}-${offset + lines.length}` : ''}.`;
-        return ok([header, ...lines].join('\n'), { ...list, requests });
+        const target = recurring[0];
+        const stop = !args.resume;
+        await findAcrossApis((a) => a.setRecurrenceStopped(target.requestId, stop));
+        return ok(
+          `${stop ? 'Stopped' : 'Resumed'} the ${target.recurrence?.frequency?.toLowerCase()} invoice ${target.requestId} ` +
+            `(${target.requestAmount} ${target.invoiceCurrency}).${stop ? ' No new invoices will be created from it.' : ''}`,
+          { requestId: target.requestId, isRecurrenceStopped: stop },
+        );
       }),
   );
 
@@ -418,17 +506,26 @@ export function createServer(config: ServerConfig, fetchImpl?: FetchLike, notebo
   return server;
 }
 
-/** Lists invoices from several Client IDs, merged newest first. */
-async function mergeLists(apis: RequestApi[], walletAddress: string | undefined, limit: number, offset: number) {
-  const window = Math.min(100, offset + limit);
-  const lists = await Promise.all(apis.map((a) => a.listRequests({ walletAddress, limit: window, offset: 0 })));
+/** Reads every invoice (up to LIST_CAP per Client ID) from all credentials, merged newest first. */
+async function fetchAllInvoices(apis: RequestApi[], walletAddress: string | undefined) {
+  let capped = false;
+  const pages = await Promise.all(
+    apis.map(async (a) => {
+      const out: RequestListItem[] = [];
+      for (let offset = 0; offset < LIST_CAP; offset += 100) {
+        const page = await a.listRequests({ walletAddress, limit: 100, offset: offset || undefined });
+        out.push(...page.requests);
+        const total = page.pagination?.total;
+        if (page.requests.length < 100 || (total !== undefined && out.length >= total)) return out;
+      }
+      capped = true;
+      return out;
+    }),
+  );
   const byId = new Map<string, RequestListItem>();
-  for (const l of lists) for (const r of l.requests) byId.set(r.requestId, r);
-  const merged = [...byId.values()].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
-  return {
-    requests: merged.slice(offset, offset + limit),
-    pagination: { total: lists.reduce((n, l) => n + (l.pagination?.total ?? l.requests.length), 0), limit, offset },
-  };
+  for (const list of pages) for (const r of list) byId.set(r.requestId, r);
+  const requests = [...byId.values()].sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+  return { requests, capped };
 }
 
 export function describeStatus(s: RequestStatus, saved?: NotebookEntry): string {
@@ -438,6 +535,9 @@ export function describeStatus(s: RequestStatus, saved?: NotebookEntry): string 
     `Invoice ${s.requestId}${label}: ${s.hasBeenPaid ? 'PAID' : 'NOT PAID YET'}${s.status ? ` (status: ${s.status})` : ''}.`,
     `Amount: ${amountText}${s.paymentCurrency ? `, paid in ${s.paymentCurrency}` : ''}${Number(s.amountInUsd) > 0 ? ` (~$${s.amountInUsd})` : ''}.`,
   ];
+  if (s.recurrence?.frequency) {
+    lines.push(`Repeats ${s.recurrence.frequency.toLowerCase()}${s.isRecurrenceStopped ? ' (stopped)' : ''}.`);
+  }
   if (s.payee) lines.push(`Payee: ${s.payee}`);
   if (s.reference) lines.push(`Reference: ${s.reference}`);
   for (const p of s.payments ?? []) {

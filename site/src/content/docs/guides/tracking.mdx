@@ -1,0 +1,42 @@
+---
+title: Track what you're owed
+description: Totals, filters and chasing unpaid invoices.
+---
+
+Ask in plain language. The assistant uses `list_invoices` with the right filters and gives exact totals per currency.
+
+## Who owes me?
+
+> Who still owes me money?
+
+```txt
+8 invoice(s) (unpaid).
+You're owed 1,250 USDC across 4 invoices and 0.5 ETH across 1 invoice.
+- UNPAID 500 USDC for Acme "logo design" (2026-11-03) id 01ed…
+- UNPAID 250 USDC for Bob "website" (2026-11-10) id 0133…
+…
+```
+
+Totals are exact, with no rounding, and cover every matching invoice, not just the ones shown.
+
+## Filters
+
+| You say | Filter used |
+|---|---|
+| "unpaid only" | `status: "unpaid"` |
+| "what got paid?" | `status: "paid"` |
+| "this month" / "last month" | `period: "this_month"` / `"last_month"` |
+| "in the last 30 days" / "this year" | `period: "last_30_days"` / `"this_year"` |
+| "older than 2 weeks" | `olderThanDays: 14` |
+| "for Acme" | `who: "Acme"` |
+
+They combine: *"What's still unpaid from more than two weeks ago?"*
+
+## Chasing a late payer
+
+> Who's more than two weeks late? Draft a friendly reminder for each, with their link.
+
+The assistant lists them, gets each saved link with `get_payment_link` and drafts the messages. **You** send them; this
+server never sends messages.
+
+Totals read up to the latest 500 invoices per account.
