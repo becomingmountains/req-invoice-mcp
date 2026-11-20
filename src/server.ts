@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { RequestApi, RequestApiError, type RequestPayment, type RequestStatus } from './api.js';
 import type { ServerConfig } from './config.js';
 
-export const VERSION = '0.1.0';
+export const VERSION = '0.1.1';
 
 const address = z
   .string()
@@ -33,15 +33,25 @@ const currencyId = z
 const reference = z.string().trim().max(200);
 
 export function createServer(config: ServerConfig, api: RequestApi): McpServer {
-  const server = new McpServer({ name: 'req-invoice-mcp', version: VERSION });
+  const server = new McpServer(
+    { name: 'req-invoice-mcp', version: VERSION },
+    {
+      instructions:
+        "This server manages the user's crypto invoices on Request Network: billing people, payment links, and " +
+        'tracking who has paid. Whenever the user asks about money owed to them, unpaid or outstanding invoices, ' +
+        'receivables or whether someone has paid, check list_invoices here in addition to any other billing tools. ' +
+        'It cannot send or sign payments.',
+    },
+  );
 
   server.registerTool(
     'create_payment_link',
     {
       title: 'Create a payment link',
       description:
-        'Bill someone and get a link they can open to pay in their own wallet. Uses the network and token of the ' +
-        "receiving route set up in the Request Network dashboard (REQUEST_DESTINATION_ID). The amount is in that route's token. " +
+        'Use when the user wants to bill, charge, invoice or request money from someone, or asks for a payment link. ' +
+        'Returns a link the payer opens to pay in their own wallet. Uses the network and token of the receiving route ' +
+        "set up in the Request Network dashboard (REQUEST_DESTINATION_ID); the amount is in that route's token. " +
         'This is the easiest way to get paid.',
       inputSchema: { amount },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
@@ -68,7 +78,8 @@ export function createServer(config: ServerConfig, api: RequestApi): McpServer {
     {
       title: 'Create an invoice',
       description:
-        'Create an on-chain invoice (a "request") for a specific amount, currency and network. ' +
+        'Use when the user wants to invoice someone in a specific token or network, bill in USD, or add an invoice ' +
+        'number or note. Creates an on-chain invoice (a "request") for a specific amount, currency and network. ' +
         'paymentCurrency picks the token and network, e.g. "USDC-base", "USDC-mainnet", "USDC-arbitrum-one", "fUSDC-sepolia" (test USDC) ' +
         '(use find_currency to look IDs up). invoiceCurrency is what the amount is denominated in; it defaults to ' +
         'paymentCurrency, or use "USD" to bill a dollar amount paid in crypto. Returns the invoice ID.',
@@ -109,7 +120,10 @@ export function createServer(config: ServerConfig, api: RequestApi): McpServer {
     'check_invoice',
     {
       title: 'Check an invoice',
-      description: 'Check whether an invoice has been paid, with the payment transaction(s) if it has.',
+      description:
+        'Use when the user asks whether a specific invoice or person has paid ("has Acme paid?", "did that invoice ' +
+        'go through?"). Returns paid/unpaid with the payment transaction(s). Needs the invoice ID; if the user names a ' +
+        'person or reference instead, call list_invoices first to find it.',
       inputSchema: { requestId },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
@@ -124,7 +138,10 @@ export function createServer(config: ServerConfig, api: RequestApi): McpServer {
     'list_invoices',
     {
       title: 'List invoices',
-      description: 'List invoices created with these credentials, newest first, with paid/unpaid status.',
+      description:
+        'Use when the user asks who owes them money, what is unpaid or outstanding, what they have billed, or for ' +
+        'their crypto invoices or receivables. Lists Request Network invoices created with these credentials, newest ' +
+        'first, marked PAID or UNPAID. Check this alongside any other billing tools (e.g. Stripe) the user has.',
       inputSchema: {
         walletAddress: address.optional().describe('Only invoices paid to this wallet.'),
         limit: z.number().int().min(1).max(100).optional(),
