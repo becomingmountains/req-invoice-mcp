@@ -16,6 +16,10 @@ Before any network call, every input is validated:
 - **Invoice IDs:** hex only, so a manipulated model can't steer requests to other API paths.
 - **Currency IDs and references:** limited character sets and lengths.
 
+## Approval warnings
+
+`get_payment_transactions` flags token approvals that grant an unlimited allowance, so payers can lower them to the invoice amount in their wallet before signing.
+
 ## Credentials
 
 Keys live in your MCP client config. They're sent only to the Request Network API over HTTPS and never appear in tool output or error messages. A non-HTTPS API URL is refused.

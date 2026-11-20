@@ -9,7 +9,7 @@ All settings are environment variables, set in your MCP client's config. The ser
 |---|---|---|
 | `REQUEST_CLIENT_ID` | this or `REQUEST_API_KEY` | Client ID from the dashboard (route → Manage → Client IDs). |
 | `REQUEST_API_KEY` | this or `REQUEST_CLIENT_ID` | Server-side API key. Takes priority over the Client ID if both are set. |
-| `REQUEST_ORIGIN` | with a Client ID | Origin matching the Client ID's allowed domain. The API checks it. |
+| `REQUEST_ORIGIN` | no | Only if your Client ID is restricted to a domain: an origin it allows. Not needed by default. |
 | `REQUEST_DESTINATION_ID` | for `create_payment_link` | Your dashboard Route ID. |
 | `REQUEST_PAYEE` | for `create_invoice` with an API key | Default wallet that gets paid (`0x…` or Tron `T…`). |
 | `REQUEST_API_URL` | no | API base URL. Default `https://api.request.network`. Must be HTTPS. |

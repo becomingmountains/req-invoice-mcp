@@ -7,7 +7,7 @@ Errors come back as tool errors with a plain-language message, and never include
 
 | Message | Cause | Fix |
 |---|---|---|
-| `error 401 … (check REQUEST_API_KEY / REQUEST_CLIENT_ID)` | Missing or invalid credentials | Re-copy your Client ID or API key. With a Client ID, check `REQUEST_ORIGIN`. |
+| `error 401 … (check REQUEST_API_KEY / REQUEST_CLIENT_ID)` | Missing or invalid credentials | Re-copy your Client ID or API key. If your Client ID is domain-restricted, set `REQUEST_ORIGIN`. |
 | `error 403 …` | Client ID revoked or origin not allowed | Generate a new Client ID or fix the allowed domain. |
 | `error 404 … (no invoice with that ID)` | Wrong invoice ID | Use `list_invoices` to find it. |
 | `error 400: …` | The API rejected an input, e.g. an unknown currency | Read the detail; use `find_currency` for IDs. |

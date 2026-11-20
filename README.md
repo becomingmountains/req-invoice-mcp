@@ -9,6 +9,10 @@ An [MCP](https://modelcontextprotocol.io) server for [Request Network](https://r
 
 **It holds no wallet and can't spend money.** It creates and reads invoices only. Payers pay from their own wallet.
 
+![Demo: create a payment link, the payer pays, the assistant confirms it's paid. Real run on Sepolia testnet.](assets/demo.gif)
+
+<sub>Real run on Sepolia testnet: [the payment transaction](https://sepolia.etherscan.io/tx/0x66d0e4cff82b1c6ba0a4670436908bbdd46ed273075364af5b3226e3565cc2f6).</sub>
+
 📖 **Docs:** https://becomingmountains.github.io/req-invoice-mcp/ (source in [`site/`](site/))
 
 > Unofficial community project. Not affiliated with or endorsed by Request Network.
@@ -22,7 +26,7 @@ An [MCP](https://modelcontextprotocol.io) server for [Request Network](https://r
 | `check_invoice` | Paid or not, with the payment transaction. |
 | `list_invoices` | Everything you've billed, paid and unpaid. |
 | `get_payment_transactions` | For payers: the unsigned transactions to pay an invoice in their own wallet. |
-| `find_currency` | Look up currency IDs like `USDC-base` or `ETH-sepolia-sepolia`. |
+| `find_currency` | Look up currency IDs like `USDC-base` or `fUSDC-sepolia`. |
 
 ## Quick start
 
@@ -37,7 +41,6 @@ An [MCP](https://modelcontextprotocol.io) server for [Request Network](https://r
       "args": ["-y", "github:becomingmountains/req-invoice-mcp"],
       "env": {
         "REQUEST_CLIENT_ID": "your-client-id",
-        "REQUEST_ORIGIN": "https://your-allowed-domain.example",
         "REQUEST_DESTINATION_ID": "0xYourWallet@eip155:1#ABCD1234:0xTokenAddress",
         "REQUEST_PAYEE": "0xYourWallet"
       }
@@ -53,7 +56,7 @@ An [MCP](https://modelcontextprotocol.io) server for [Request Network](https://r
 | Variable | Required | Purpose |
 |---|---|---|
 | `REQUEST_CLIENT_ID` or `REQUEST_API_KEY` | yes | Request Network credentials. |
-| `REQUEST_ORIGIN` | with Client ID | Origin matching the Client ID's allowed domain. |
+| `REQUEST_ORIGIN` | no | Only if your Client ID is restricted to a domain: an origin it allows. |
 | `REQUEST_DESTINATION_ID` | for links | Your dashboard Route ID. Enables `create_payment_link`. |
 | `REQUEST_PAYEE` | for `create_invoice` with an API key | Default wallet that gets paid. |
 | `REQUEST_API_URL` | no | API base URL (default `https://api.request.network`). |

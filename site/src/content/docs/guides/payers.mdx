@@ -22,7 +22,7 @@ An agent with its own wallet can ask for the transactions:
 1. A token **approval**, if the payment contract can't spend the token yet.
 2. The **payment** itself, carrying the invoice's payment reference.
 
-It also flags insufficient balance or gas. The agent's own wallet tooling signs and sends them.
+It also flags insufficient balance or gas, and warns when an approval is **unlimited**. Request Network's API currently asks for an unlimited token approval to its payment contract; most wallets let you edit it down to the invoice amount before signing. The agent's own wallet tooling signs and sends them.
 
 <Aside type="caution" title="Automating payments">
   Use a separate wallet holding only a small budget, never your main wallet, and enforce spending

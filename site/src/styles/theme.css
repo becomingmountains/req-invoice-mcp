@@ -38,3 +38,4 @@
 .hero h1 { letter-spacing: -0.03em; }
 .card { border-radius: 0.75rem; }
 .unofficial { font-size: var(--sl-text-sm); color: var(--sl-color-gray-3); }
+.demo { width: 100%; border-radius: 0.75rem; border: 1px solid var(--sl-color-gray-5); display: block; margin-bottom: 0.5rem; }
