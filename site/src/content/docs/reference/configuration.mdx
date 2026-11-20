@@ -13,6 +13,7 @@ All settings are environment variables, set in your MCP client's config. The ser
 | `REQUEST_DESTINATION_ID` | for `create_payment_link` | One dashboard Route ID. |
 | `REQUEST_ROUTES` | to be paid in several currencies | Several Route IDs, separated by commas, each optionally followed by `=` and the Client ID generated on that route. The first is the default. See [Multiple currencies](/req-invoice-mcp/guides/payment-links/#multiple-currencies-and-networks). |
 | `REQUEST_PAYEE` | for `create_invoice` with an API key | Default wallet that gets paid (`0x…` or Tron `T…`). |
+| `REQUEST_NOTES_FILE` | no | Where the local notebook (names, notes, links) is saved. Default `~/.config/req-invoice-mcp/invoices.json`; `off` keeps it in memory only. |
 | `REQUEST_API_URL` | no | API base URL. Default `https://api.request.network`. Must be HTTPS. |
 
 The server checks settings at startup and exits with a clear message if something's missing or malformed.

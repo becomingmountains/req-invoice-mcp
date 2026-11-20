@@ -20,6 +20,12 @@ Before any network call, every input is validated:
 
 `get_payment_transactions` flags token approvals that grant an unlimited allowance, so payers can lower them to the invoice amount in their wallet before signing.
 
+## Local notebook
+
+Names, notes and payment links you give invoices are saved in a private file on your computer
+(`~/.config/req-invoice-mcp/invoices.json`, readable only by you). It's never uploaded. Set `REQUEST_NOTES_FILE` to
+move it, or to `off` to keep nothing on disk.
+
 ## Credentials
 
 Keys live in your MCP client config. They're sent only to the Request Network API over HTTPS and never appear in tool output or error messages. A non-HTTPS API URL is refused.

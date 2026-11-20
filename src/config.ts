@@ -1,4 +1,5 @@
 import type { ApiConfig } from './api.js';
+import { defaultNotebookPath } from './notebook.js';
 import { parseRouteId, type Route } from './routes.js';
 
 export interface ServerConfig {
@@ -8,6 +9,8 @@ export interface ServerConfig {
   defaultPayee?: string;
   /** Receiving routes for payment links, in priority order (the first is the default). */
   routes: Route[];
+  /** Local notebook file (who each invoice is for, notes, links); undefined keeps it in memory only. */
+  notebookPath?: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
@@ -45,6 +48,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     },
     defaultPayee,
     routes: uniqueRoutes,
+    notebookPath: notebookPath(clean(env.REQUEST_NOTES_FILE), env),
   };
 }
 
@@ -73,6 +77,12 @@ export function parseRoutes(value: string | undefined, name: string): Route[] {
       }
       return { ...parsed, clientId: clientId || undefined };
     });
+}
+
+/** REQUEST_NOTES_FILE: a path, "off" to keep notes in memory only, or unset for the default location. */
+function notebookPath(value: string | undefined, env: NodeJS.ProcessEnv): string | undefined {
+  if (value?.toLowerCase() === 'off') return undefined;
+  return value ?? defaultNotebookPath(env);
 }
 
 function clean(value: string | undefined): string | undefined {

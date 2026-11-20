@@ -68,7 +68,7 @@ async function connect(routes: Record<string, [number, unknown]>, overrides: Par
 }
 
 describe('tool list', () => {
-  it('exposes exactly the seven tools, and none of them can spend money', async () => {
+  it('exposes exactly the eight tools, and none of them can spend money', async () => {
     const { client } = await connect({});
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
@@ -76,13 +76,14 @@ describe('tool list', () => {
       'create_invoice',
       'create_payment_link',
       'find_currency',
+      'get_payment_link',
       'get_payment_transactions',
       'list_invoices',
       'list_routes',
     ]);
     for (const t of tools) expect(t.annotations?.destructiveHint ?? false).toBe(false);
     const readOnly = tools.filter((t) => t.annotations?.readOnlyHint).map((t) => t.name).sort();
-    expect(readOnly).toEqual(['check_invoice', 'find_currency', 'get_payment_transactions', 'list_invoices', 'list_routes']);
+    expect(readOnly).toEqual(['check_invoice', 'find_currency', 'get_payment_link', 'get_payment_transactions', 'list_invoices', 'list_routes']);
   });
 });
 

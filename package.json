@@ -1,6 +1,6 @@
 {
   "name": "req-invoice-mcp",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Unofficial MCP server that lets AI assistants create, share and track crypto invoices on Request Network. No wallet, no spending.",
   "type": "module",
   "bin": {

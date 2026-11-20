@@ -16,6 +16,8 @@ Every tool returns a readable summary followed by the raw API response as JSON. 
 | `amount` | string | yes | Plain decimal in the route's token, e.g. `"250"`. |
 | `currency` | string | no | Token to be paid in, e.g. `USDC`, `USDT`. |
 | `network` | string | no | e.g. `base`, `arbitrum`, `ethereum`, `sepolia`. |
+| `for` | string | no | Who is billed, e.g. `Acme`. Saved locally so you can ask about it by name. |
+| `note` | string | no | What it's for, e.g. `logo design`. |
 
 With neither, the default (first) route is used. If more than one route matches, it asks which network instead of guessing.
 
@@ -37,16 +39,18 @@ With neither, the default (first) route is used. If more than one route matches,
 | `payee` | address | no | Defaults to `REQUEST_PAYEE`. |
 | `payer` | address | no | Expected payer. |
 | `reference` | string | no | Your note or invoice number, up to 200 characters. |
+| `for` | string | no | Who is billed. Saved locally. |
 
 **Returns** `requestId`, `paymentReference`.
 
 ## check_invoice
 
-<Badge text="read-only" /> Whether an invoice is paid, with payments and transaction hashes.
+<Badge text="read-only" /> Whether an invoice is paid, with payments and transaction hashes. Ask by ID or by name.
 
-| Input | Type | Required |
-|---|---|---|
-| `requestId` | hex string | yes |
+| Input | Type | Required | Notes |
+|---|---|---|---|
+| `requestId` | hex string | one of these | |
+| `who` | string | one of these | Name or note it was created with; checks up to 5 matching invoices. |
 
 **Returns** `hasBeenPaid`, `status`, `requestAmount`, `invoiceCurrency`, `paymentCurrency`, `payments[]`, `txHash` and more.
 
@@ -57,8 +61,20 @@ With neither, the default (first) route is used. If more than one route matches,
 | Input | Type | Required | Notes |
 |---|---|---|---|
 | `walletAddress` | address | no | Only invoices paid to this wallet. |
+| `who` | string | no | Only invoices saved with this name or note. |
 | `limit` | 1–100 | no | Default 20. |
 | `offset` | integer | no | For paging. |
+
+## get_payment_link
+
+<Badge text="read-only" /> The saved payment link for an invoice, so you can send it again. This server never sends messages; it gives you the link to send.
+
+| Input | Type | Required |
+|---|---|---|
+| `requestId` | hex string | one of these |
+| `who` | string | one of these |
+
+Only links created with `create_payment_link` on the same computer are saved.
 
 ## get_payment_transactions
 

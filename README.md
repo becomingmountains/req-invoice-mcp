@@ -24,7 +24,8 @@ An [MCP](https://modelcontextprotocol.io) server for [Request Network](https://r
 | `create_payment_link` | Bill someone and get a link they open to pay, in any of your currencies and networks. |
 | `list_routes` | The currencies and networks you can be paid in. |
 | `create_invoice` | Create an invoice in a specific token and network, or bill in USD and get paid in crypto. |
-| `check_invoice` | Paid or not, with the payment transaction. |
+| `check_invoice` | Paid or not, with the payment transaction. Ask by name: "has Acme paid?" |
+| `get_payment_link` | The saved link for an invoice, so you can send it again. |
 | `list_invoices` | Everything you've billed, paid and unpaid. |
 | `get_payment_transactions` | For payers: the unsigned transactions to pay an invoice in their own wallet. |
 | `find_currency` | Look up currency IDs like `USDC-base` or `fUSDC-sepolia`. |
@@ -61,6 +62,7 @@ An [MCP](https://modelcontextprotocol.io) server for [Request Network](https://r
 | `REQUEST_DESTINATION_ID` | for links | One dashboard Route ID. Enables `create_payment_link`. |
 | `REQUEST_ROUTES` | for several currencies | Several Route IDs, comma-separated, each optionally `=CLIENT_ID`. The first is the default. |
 | `REQUEST_PAYEE` | for `create_invoice` with an API key | Default wallet that gets paid. |
+| `REQUEST_NOTES_FILE` | no | Local notebook of names, notes and links (default `~/.config/req-invoice-mcp/invoices.json`, `off` to disable). |
 | `REQUEST_API_URL` | no | API base URL (default `https://api.request.network`). |
 
 ## Testing on Sepolia

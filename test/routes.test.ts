@@ -155,7 +155,10 @@ afterEach(async () => {
 });
 
 async function connectMulti() {
-  const config = loadConfig({ REQUEST_ROUTES: `${BASE_ROUTE}=cli_base, ${ARB_ROUTE}=cli_arb, ${ARB_USDC_ROUTE}=cli_arb` });
+  const config = loadConfig({
+    REQUEST_ROUTES: `${BASE_ROUTE}=cli_base, ${ARB_ROUTE}=cli_arb, ${ARB_USDC_ROUTE}=cli_arb`,
+    REQUEST_NOTES_FILE: 'off',
+  });
   const fake = fakeApi();
   const server = createServer(config, fake.fetchImpl);
   const [a, b] = InMemoryTransport.createLinkedPair();

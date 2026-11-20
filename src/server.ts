@@ -10,9 +10,10 @@ import {
   type RequestStatus,
 } from './api.js';
 import type { ServerConfig } from './config.js';
+import { fileNotebook, memoryNotebook, type Notebook, type NotebookEntry } from './notebook.js';
 import { chooseRoute, networkLabel, type Route } from './routes.js';
 
-export const VERSION = '0.2.0';
+export const VERSION = '0.3.0';
 
 const address = z
   .string()
@@ -39,9 +40,18 @@ const currencyId = z
   .regex(/^[A-Za-z0-9._-]{2,64}$/, 'Currency IDs look like "USDC-base", "USDC-mainnet", "fUSDC-sepolia" or "USD"');
 
 const reference = z.string().trim().max(200);
+const who = z.string().trim().min(1).max(100);
 
-export function createServer(config: ServerConfig, fetchImpl?: FetchLike): McpServer {
+export function createServer(config: ServerConfig, fetchImpl?: FetchLike, notebookOverride?: Notebook): McpServer {
   const api = new RequestApi(config.api, fetchImpl);
+  const notebook = notebookOverride ?? (config.notebookPath ? fileNotebook(config.notebookPath) : memoryNotebook());
+  const remember = (entry: NotebookEntry) => {
+    try {
+      notebook.save(entry);
+    } catch {
+      // The invoice exists either way; only the local label is lost.
+    }
+  };
   const routeApis = new Map<string, RequestApi>();
   /** API client for a route: its own Client ID when it has one, otherwise the default credentials. */
   const apiFor = (route?: Route): RequestApi => {
@@ -112,15 +122,18 @@ export function createServer(config: ServerConfig, fetchImpl?: FetchLike): McpSe
         'Use when the user wants to bill, charge, invoice or request money from someone, or asks for a payment link. ' +
         'Returns a link the payer opens to pay in their own wallet. Each receiving route set up in the Request Network ' +
         'dashboard is one network and token; pass currency and/or network to pick one (see list_routes), or omit both ' +
-        "to use the default route. The amount is in the chosen route's token. This is the easiest way to get paid.",
+        "to use the default route. The amount is in the chosen route's token. Pass `for` (who is billed) and `note` so " +
+        'the user can later ask about it by name. This is the easiest way to get paid.',
       inputSchema: {
         amount,
         currency: z.string().trim().max(20).optional().describe('Token to be paid in, e.g. "USDC" or "USDT".'),
         network: z.string().trim().max(40).optional().describe('Network, e.g. "base", "arbitrum", "ethereum", "sepolia".'),
+        for: who.optional().describe('Who is being billed, e.g. "Acme". Saved locally so you can ask "has Acme paid?" later.'),
+        note: reference.optional().describe('What it is for, e.g. "logo design".'),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
-    async ({ amount, currency, network }) =>
+    async ({ amount, currency, network, for: billed, note }) =>
       run(async () => {
         if (!config.routes.length) {
           return fail(
@@ -137,8 +150,13 @@ export function createServer(config: ServerConfig, fetchImpl?: FetchLike): McpSe
         const route = choice.route;
         const link = await apiFor(route).createPaymentLink(route.id, amount);
         const symbol = await symbolFor(route);
+        const createdAt = new Date().toISOString();
+        for (const id of link.requestIds) {
+          remember({ requestId: id, for: billed, note, link: link.securePaymentUrl, amount, currency: symbol, createdAt });
+        }
         return ok(
-          `Payment link created for ${amount} ${symbol ?? ''} on ${networkLabel(route.network, route.chain)}. ` +
+          `Payment link created for ${amount} ${symbol ?? ''} on ${networkLabel(route.network, route.chain)}` +
+            `${billed ? ` for ${billed}` : ''}${note ? ` (${note})` : ''}. ` +
             `Send this to the payer:\n${link.securePaymentUrl}\n` +
             `Invoice ID: ${link.requestIds.join(', ')} (use check_invoice to see when it's paid).`,
           { ...link, route: { id: route.id, network: route.network, token: route.token, symbol } },
@@ -187,6 +205,7 @@ export function createServer(config: ServerConfig, fetchImpl?: FetchLike): McpSe
         payee: address.optional().describe('Wallet that gets paid. Defaults to REQUEST_PAYEE.'),
         payer: address.optional().describe('Wallet expected to pay (optional).'),
         reference: reference.optional().describe('Your own note or invoice number, e.g. "INV-042 website".'),
+        for: who.optional().describe('Who is being billed, e.g. "Acme". Saved locally for "has Acme paid?".'),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
@@ -207,8 +226,16 @@ export function createServer(config: ServerConfig, fetchImpl?: FetchLike): McpSe
           payer: args.payer,
           reference: args.reference,
         });
+        remember({
+          requestId: created.requestId,
+          for: args.for,
+          note: args.reference,
+          amount: args.amount,
+          currency: args.invoiceCurrency ?? args.paymentCurrency,
+          createdAt: new Date().toISOString(),
+        });
         return ok(
-          `Invoice created: ${args.amount} ${args.invoiceCurrency ?? args.paymentCurrency}, paid in ${args.paymentCurrency}` +
+          `Invoice created${args.for ? ` for ${args.for}` : ''}: ${args.amount} ${args.invoiceCurrency ?? args.paymentCurrency}, paid in ${args.paymentCurrency}` +
             `${payee ? ` to ${payee}` : ''}.\nInvoice ID: ${created.requestId}\n` +
             'The payer can get the transactions to sign with get_payment_transactions. Use check_invoice to see when it is paid.',
           created,
@@ -222,15 +249,32 @@ export function createServer(config: ServerConfig, fetchImpl?: FetchLike): McpSe
       title: 'Check an invoice',
       description:
         'Use when the user asks whether a specific invoice or person has paid ("has Acme paid?", "did that invoice ' +
-        'go through?"). Returns paid/unpaid with the payment transaction(s). Needs the invoice ID; if the user names a ' +
-        'person or reference instead, call list_invoices first to find it.',
-      inputSchema: { requestId },
+        'go through?"). Returns paid/unpaid with the payment transaction(s). Pass the invoice ID, or `who` with the ' +
+        'name or note it was created with (e.g. "Acme") to check every matching invoice.',
+      inputSchema: {
+        requestId: requestId.optional(),
+        who: who.optional().describe('Name or note the invoice was created with, e.g. "Acme".'),
+      },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
-    async ({ requestId }) =>
+    async (args) =>
       run(async () => {
-        const status = await findAcrossApis((a) => a.getRequest(requestId));
-        return ok(describeStatus(status), status);
+        if (args.requestId) {
+          const status = await findAcrossApis((a) => a.getRequest(args.requestId!));
+          return ok(describeStatus(status, notebook.get(status.requestId)), status);
+        }
+        if (!args.who) return fail('Pass an invoice ID, or who it was for (e.g. "Acme").');
+        const matches = notebook.search(args.who);
+        if (!matches.length) {
+          return fail(
+            `No saved invoices for "${args.who}". Names are only known for invoices created with \`for\` or a note on ` +
+              'this computer; use list_invoices to find the invoice ID.',
+          );
+        }
+        const shown = matches.slice(0, 5);
+        const statuses = await Promise.all(shown.map((m) => findAcrossApis((a) => a.getRequest(m.requestId))));
+        const more = matches.length > shown.length ? `\n…and ${matches.length - shown.length} older invoice(s) for "${args.who}".` : '';
+        return ok(statuses.map((st, i) => describeStatus(st, shown[i])).join('\n\n') + more, statuses);
       }),
   );
 
@@ -244,6 +288,7 @@ export function createServer(config: ServerConfig, fetchImpl?: FetchLike): McpSe
         'first, marked PAID or UNPAID. Check this alongside any other billing tools (e.g. Stripe) the user has.',
       inputSchema: {
         walletAddress: address.optional().describe('Only invoices paid to this wallet.'),
+        who: who.optional().describe('Only invoices saved with this name or note, e.g. "Acme".'),
         limit: z.number().int().min(1).max(100).optional(),
         offset: z.number().int().min(0).optional(),
       },
@@ -258,14 +303,63 @@ export function createServer(config: ServerConfig, fetchImpl?: FetchLike): McpSe
           apis.length === 1
             ? await api.listRequests({ walletAddress: args.walletAddress, limit, offset: args.offset })
             : await mergeLists(apis, args.walletAddress, limit, offset);
-        const lines = list.requests.map(
+        let requests = list.requests.map((r) => ({ ...r, saved: notebook.get(r.requestId) }));
+        if (args.who) {
+          const ids = new Set(notebook.search(args.who).map((e) => e.requestId));
+          requests = requests.filter((r) => ids.has(r.requestId));
+        }
+        const lines = requests.map(
           (r) =>
             `- ${r.hasBeenPaid ? 'PAID  ' : 'UNPAID'} ${r.amount ?? '?'} ${r.invoiceCurrency ?? ''}` +
-            `${r.reference ? ` "${r.reference}"` : ''}${r.createdAt ? ` (${r.createdAt.slice(0, 10)})` : ''} id ${r.requestId}`,
+            `${r.saved?.for ? ` for ${r.saved.for}` : ''}` +
+            `${r.saved?.note ?? r.reference ? ` "${r.saved?.note ?? r.reference}"` : ''}` +
+            `${r.createdAt ? ` (${r.createdAt.slice(0, 10)})` : ''} id ${r.requestId}`,
         );
+        if (args.who) {
+          return ok(
+            lines.length ? `${lines.length} invoice(s) for "${args.who}" in the latest ${list.requests.length}:\n${lines.join('\n')}` : `No invoices for "${args.who}" in the latest ${list.requests.length}.`,
+            { ...list, requests },
+          );
+        }
         const { total } = list.pagination;
         const header = `${total} invoice(s)${total > lines.length ? `, showing ${offset + 1}-${offset + lines.length}` : ''}.`;
-        return ok([header, ...lines].join('\n'), list);
+        return ok([header, ...lines].join('\n'), { ...list, requests });
+      }),
+  );
+
+  server.registerTool(
+    'get_payment_link',
+    {
+      title: 'Get a saved payment link',
+      description:
+        'Use when the user wants to resend, share or find the payment link for an invoice ("send Acme their link ' +
+        'again", "what was the link for the logo invoice?"). Returns the saved link for the user to send; this server ' +
+        'never sends messages. Pass the invoice ID or `who`.',
+      inputSchema: {
+        requestId: requestId.optional(),
+        who: who.optional().describe('Name or note the invoice was created with, e.g. "Acme".'),
+      },
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async (args) =>
+      run(async () => {
+        const entries = args.requestId
+          ? [notebook.get(args.requestId)].filter((e): e is NotebookEntry => Boolean(e))
+          : args.who
+            ? notebook.search(args.who)
+            : undefined;
+        if (!entries) return fail('Pass an invoice ID, or who it was for (e.g. "Acme").');
+        const withLinks = entries.filter((e) => e.link);
+        if (!withLinks.length) {
+          return fail(
+            'No saved payment link for that. Links are saved for invoices made with create_payment_link on this ' +
+              'computer; invoices from create_invoice have no hosted link.',
+          );
+        }
+        const lines = withLinks
+          .slice(0, 5)
+          .map((e) => `- ${e.amount ?? '?'} ${e.currency ?? ''}${e.for ? ` for ${e.for}` : ''}${e.note ? ` (${e.note})` : ''}, ${e.createdAt.slice(0, 10)}:\n  ${e.link}`);
+        return ok(`Payment link(s) to send:\n${lines.join('\n')}`, withLinks.slice(0, 5));
       }),
   );
 
@@ -337,10 +431,11 @@ async function mergeLists(apis: RequestApi[], walletAddress: string | undefined,
   };
 }
 
-export function describeStatus(s: RequestStatus): string {
+export function describeStatus(s: RequestStatus, saved?: NotebookEntry): string {
   const amountText = `${s.requestAmount ?? '?'} ${s.invoiceCurrency ?? ''}`.trim();
+  const label = saved?.for ? ` for ${saved.for}${saved.note ? ` (${saved.note})` : ''}` : saved?.note ? ` (${saved.note})` : '';
   const lines = [
-    `Invoice ${s.requestId}: ${s.hasBeenPaid ? 'PAID' : 'NOT PAID YET'}${s.status ? ` (status: ${s.status})` : ''}.`,
+    `Invoice ${s.requestId}${label}: ${s.hasBeenPaid ? 'PAID' : 'NOT PAID YET'}${s.status ? ` (status: ${s.status})` : ''}.`,
     `Amount: ${amountText}${s.paymentCurrency ? `, paid in ${s.paymentCurrency}` : ''}${Number(s.amountInUsd) > 0 ? ` (~$${s.amountInUsd})` : ''}.`,
   ];
   if (s.payee) lines.push(`Payee: ${s.payee}`);

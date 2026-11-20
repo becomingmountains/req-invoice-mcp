@@ -38,7 +38,12 @@ Set `invoiceCurrency` to `USD`:
 
 ## Who gets paid
 
-`payee` defaults to `REQUEST_PAYEE`. With a Client ID and no payee, the route's wallet is used.
+`payee` defaults to `REQUEST_PAYEE`, then to the wallet of your route on the same network. With a Client ID and no payee, the route's wallet is used.
+
+## Any network, one Client ID
+
+Unlike payment links, custom invoices aren't tied to your route's network: a Client ID made on a Sepolia route created a
+USDC invoice on Base in our testing. Name the token and network in `paymentCurrency`.
 
 ## Paying a custom invoice
 
