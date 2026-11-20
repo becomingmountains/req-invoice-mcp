@@ -88,12 +88,12 @@ describe('create_payment_link', () => {
     const { call, calls } = await connect({
       'POST /v2/secure-payments': [
         201,
-        { requestIds: [REQ_ID], securePaymentUrl: 'https://secure.request.network/01ABC', token: '01ABC' },
+        { requestIds: [REQ_ID], securePaymentUrl: 'https://pay.request.network/?token=v1.abc', token: '01ABC' },
       ],
     });
     const res = await call('create_payment_link', { amount: '250' });
     expect(res.isError).toBe(false);
-    expect(res.text).toContain('https://secure.request.network/01ABC');
+    expect(res.text).toContain('https://pay.request.network/?token=v1.abc');
     expect(res.text).toContain(REQ_ID);
     expect(calls[0].body).toEqual({ requests: [{ destinationId: DEST, amount: '250' }] });
     expect(calls[0].headers['x-api-key']).toBe('secret-key');
@@ -352,6 +352,13 @@ describe('loadConfig', () => {
     expect(c.api).toMatchObject({ clientId: 'cid', origin: 'https://example.com', baseUrl: 'https://api.request.network' });
     expect(c.defaultPayee).toBe(PAYEE);
     expect(c.destinationId).toBe(DEST);
+  });
+
+  it('accepts a real Route ID and explains a Route ID cut off by "#" in a .env file', () => {
+    const real = '0x6C13b270e84E69fCB4927352f4913f386Cee9775@eip155:11155111#1436212C:0x1c7d4b196cb0c7b01d743fbc6116a902379c7238';
+    expect(loadConfig({ REQUEST_CLIENT_ID: 'c', REQUEST_DESTINATION_ID: real }).destinationId).toBe(real);
+    expect(() => loadConfig({ REQUEST_CLIENT_ID: 'c', REQUEST_DESTINATION_ID: real.split('#')[0] })).toThrow(/double quotes/);
+    expect(() => loadConfig({ REQUEST_CLIENT_ID: 'c', REQUEST_DESTINATION_ID: 'nonsense#1:2' })).toThrow(/Route ID/);
   });
 
   it('rejects a bad payee and a non-https API URL', () => {

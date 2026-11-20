@@ -33,8 +33,21 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
       origin: clean(env.REQUEST_ORIGIN),
     },
     defaultPayee,
-    destinationId: clean(env.REQUEST_DESTINATION_ID),
+    destinationId: checkDestination(clean(env.REQUEST_DESTINATION_ID)),
   };
+}
+
+// Route ID shape: <payee>@<chain namespace>:<chain id>#<hex tag>:<token address>
+const DESTINATION_RE = /^(0x[0-9a-fA-F]{40}|T[1-9A-HJ-NP-Za-km-z]{33})@[a-z0-9]+:[0-9A-Za-z]+#[0-9A-Fa-f]+:(0x[0-9a-fA-F]{40}|T[1-9A-HJ-NP-Za-km-z]{33})$/;
+
+function checkDestination(value: string | undefined): string | undefined {
+  if (value === undefined || DESTINATION_RE.test(value)) return value;
+  const hint = value.includes('#')
+    ? ''
+    : ' It looks cut off before the "#". In a .env file, wrap the value in double quotes, because "#" starts a comment.';
+  throw new Error(
+    `REQUEST_DESTINATION_ID should look like 0xWallet@eip155:1#ABCD1234:0xToken (copy the Route ID from the dashboard).${hint}`,
+  );
 }
 
 function clean(value: string | undefined): string | undefined {
