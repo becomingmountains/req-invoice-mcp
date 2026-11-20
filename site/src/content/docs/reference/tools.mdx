@@ -9,13 +9,21 @@ Every tool returns a readable summary followed by the raw API response as JSON. 
 
 ## create_payment_link
 
-<Badge text="creates" variant="success" /> Bills someone and returns a hosted payment link. Requires `REQUEST_DESTINATION_ID`.
+<Badge text="creates" variant="success" /> Bills someone and returns a hosted payment link. Needs at least one route (`REQUEST_DESTINATION_ID` or `REQUEST_ROUTES`).
 
 | Input | Type | Required | Notes |
 |---|---|---|---|
 | `amount` | string | yes | Plain decimal in the route's token, e.g. `"250"`. |
+| `currency` | string | no | Token to be paid in, e.g. `USDC`, `USDT`. |
+| `network` | string | no | e.g. `base`, `arbitrum`, `ethereum`, `sepolia`. |
 
-**Returns** `securePaymentUrl`, `requestIds`, `token`.
+With neither, the default (first) route is used. If more than one route matches, it asks which network instead of guessing.
+
+**Returns** `securePaymentUrl`, `requestIds`, `token`, and the `route` used.
+
+## list_routes
+
+<Badge text="read-only" /> The receiving routes you can be paid through: token, network and wallet, with the default marked. No inputs.
 
 ## create_invoice
 

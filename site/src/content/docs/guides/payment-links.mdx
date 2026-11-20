@@ -30,6 +30,37 @@ Send the link however you like: email, chat or a QR code.
 > Has the logo invoice been paid?
 
 <Aside>
-  The amount is in your route's token. For a different token or network, set up another route
+  The amount is in your route's token. To accept other tokens or networks, add more routes (below)
   or use [custom invoices](/req-invoice-mcp/guides/custom-invoices/).
 </Aside>
+
+## Multiple currencies and networks
+
+Each route is one wallet, one network and one token. To be paid in several, create a route for each in the
+dashboard, generate a Client ID on each, and list them in `REQUEST_ROUTES`:
+
+```json
+"env": {
+  "REQUEST_ROUTES": "0xYou@eip155:8453#AAAA1111:0xUSDC=cli_base, 0xYou@eip155:42161#BBBB2222:0xUSDT=cli_arb"
+}
+```
+
+Each entry is a Route ID, then `=` and that route's Client ID. If you also set `REQUEST_CLIENT_ID`, routes without
+their own Client ID use it. The first route is the default.
+
+Then just say what you want:
+
+> What can I get paid in?
+
+```txt
+2 route(s):
+1. USDC on Base to 0xYou… (default)
+2. USDT on Arbitrum to 0xYou…
+```
+
+> Payment link for 50 USDT.
+
+The assistant picks the Arbitrum route. If more than one route matches, like "USDC" when you take USDC on two networks, it asks which network
+instead of guessing. `list_invoices` and `check_invoice` cover invoices from every route.
+
+<Aside type="caution">In a `.env` file, wrap the value in double quotes: Route IDs contain `#`, which starts a comment.</Aside>

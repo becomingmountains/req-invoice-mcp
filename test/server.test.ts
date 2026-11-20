@@ -1,14 +1,16 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { afterEach, describe, expect, it } from 'vitest';
-import { RequestApi, type FetchLike } from '../src/api.js';
+import type { FetchLike } from '../src/api.js';
 import { loadConfig, type ServerConfig } from '../src/config.js';
+import { parseRouteId, type Route } from '../src/routes.js';
 import { createServer } from '../src/server.js';
 
 const PAYEE = '0x6923831ACf5c327260D7ac7C9DfF5b1c3cB3C7D7';
 const PAYER = '0xb07d2398d2004378cad234da0ef14f1c94a530e4';
 const REQ_ID = '01e273ecc29d4b526df3a0f1f05ffc59372af8752c2b678096e49ac270416a7cdb';
 const DEST = `${PAYEE}@eip155:11155111#A1B2C3D4:0x370DE27fdb7D1Ff1e1BaA7D11c5820a324Cf623C`;
+const route = (id: string, clientId?: string): Route => ({ ...parseRouteId(id)!, clientId });
 
 interface Call {
   method: string;
@@ -46,11 +48,11 @@ async function connect(routes: Record<string, [number, unknown]>, overrides: Par
   const config: ServerConfig = {
     api: { baseUrl: 'https://api.test', apiKey: 'secret-key' },
     defaultPayee: PAYEE,
-    destinationId: DEST,
+    routes: [route(DEST)],
     ...overrides,
   };
   const fake = fakeFetch(routes);
-  const server = createServer(config, new RequestApi(config.api, fake.fetchImpl));
+  const server = createServer(config, fake.fetchImpl);
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'test', version: '0.0.0' });
   await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
@@ -66,7 +68,7 @@ async function connect(routes: Record<string, [number, unknown]>, overrides: Par
 }
 
 describe('tool list', () => {
-  it('exposes exactly the six tools, and none of them can spend money', async () => {
+  it('exposes exactly the seven tools, and none of them can spend money', async () => {
     const { client } = await connect({});
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
@@ -76,10 +78,11 @@ describe('tool list', () => {
       'find_currency',
       'get_payment_transactions',
       'list_invoices',
+      'list_routes',
     ]);
     for (const t of tools) expect(t.annotations?.destructiveHint ?? false).toBe(false);
     const readOnly = tools.filter((t) => t.annotations?.readOnlyHint).map((t) => t.name).sort();
-    expect(readOnly).toEqual(['check_invoice', 'find_currency', 'get_payment_transactions', 'list_invoices']);
+    expect(readOnly).toEqual(['check_invoice', 'find_currency', 'get_payment_transactions', 'list_invoices', 'list_routes']);
   });
 });
 
@@ -100,7 +103,7 @@ describe('create_payment_link', () => {
   });
 
   it('explains what to do when no route is configured, without calling the API', async () => {
-    const { call, calls } = await connect({}, { destinationId: undefined });
+    const { call, calls } = await connect({}, { routes: [] });
     const res = await call('create_payment_link', { amount: '10' });
     expect(res.isError).toBe(true);
     expect(res.text).toContain('REQUEST_DESTINATION_ID');
@@ -340,13 +343,10 @@ describe('API failures', () => {
   });
 
   it('handles the network being down', async () => {
-    const config: ServerConfig = { api: { baseUrl: 'https://api.test', apiKey: 'k' }, defaultPayee: PAYEE };
-    const server = createServer(
-      config,
-      new RequestApi(config.api, async () => {
-        throw new TypeError('fetch failed');
-      }),
-    );
+    const config: ServerConfig = { api: { baseUrl: 'https://api.test', apiKey: 'k' }, defaultPayee: PAYEE, routes: [] };
+    const server = createServer(config, async () => {
+      throw new TypeError('fetch failed');
+    });
     const [a, b] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: 't', version: '0' });
     await Promise.all([server.connect(b), client.connect(a)]);
@@ -368,7 +368,7 @@ describe('API failures', () => {
 
 describe('loadConfig', () => {
   it('requires credentials', () => {
-    expect(() => loadConfig({})).toThrow(/REQUEST_API_KEY or REQUEST_CLIENT_ID/);
+    expect(() => loadConfig({})).toThrow(/REQUEST_CLIENT_ID or REQUEST_API_KEY/);
   });
 
   it('reads all settings', () => {
@@ -380,12 +380,12 @@ describe('loadConfig', () => {
     });
     expect(c.api).toMatchObject({ clientId: 'cid', origin: 'https://example.com', baseUrl: 'https://api.request.network' });
     expect(c.defaultPayee).toBe(PAYEE);
-    expect(c.destinationId).toBe(DEST);
+    expect(c.routes.map((r) => r.id)).toEqual([DEST]);
   });
 
   it('accepts a real Route ID and explains a Route ID cut off by "#" in a .env file', () => {
     const real = '0x6C13b270e84E69fCB4927352f4913f386Cee9775@eip155:11155111#1436212C:0x1c7d4b196cb0c7b01d743fbc6116a902379c7238';
-    expect(loadConfig({ REQUEST_CLIENT_ID: 'c', REQUEST_DESTINATION_ID: real }).destinationId).toBe(real);
+    expect(loadConfig({ REQUEST_CLIENT_ID: 'c', REQUEST_DESTINATION_ID: real }).routes[0]).toMatchObject({ id: real, network: 'sepolia' });
     expect(() => loadConfig({ REQUEST_CLIENT_ID: 'c', REQUEST_DESTINATION_ID: real.split('#')[0] })).toThrow(/double quotes/);
     expect(() => loadConfig({ REQUEST_CLIENT_ID: 'c', REQUEST_DESTINATION_ID: 'nonsense#1:2' })).toThrow(/Route ID/);
   });

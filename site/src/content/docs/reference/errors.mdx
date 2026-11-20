@@ -12,5 +12,7 @@ Errors come back as tool errors with a plain-language message, and never include
 | `error 404 … (no invoice with that ID)` | Wrong invoice ID | Use `list_invoices` to find it. |
 | `error 400: …` | The API rejected an input, e.g. an unknown currency | Read the detail; use `find_currency` for IDs. |
 | `error 429 … (rate limited)` | Too many requests | Wait a few seconds. |
-| `No receiving route configured` | `REQUEST_DESTINATION_ID` unset | Copy your Route ID from the dashboard. |
+| `No receiving route configured` | No route set | Copy a Route ID from the dashboard into `REQUEST_DESTINATION_ID` or `REQUEST_ROUTES`. |
+| `No route takes …` / `No route on …` | You asked for a currency or network you have no route for | Add a route for it, or pick one from the list in the message. |
+| `More than one route matches` | e.g. USDC on two networks | Say which network. |
 | `API could not be reached` / `timed out` | Network problem | Check your connection and retry. |
