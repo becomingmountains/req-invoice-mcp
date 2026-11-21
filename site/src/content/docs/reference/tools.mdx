@@ -47,7 +47,8 @@ With neither, the default (first) route is used. If more than one route matches,
 
 ## check_invoice
 
-<Badge text="read-only" /> Whether an invoice is paid, with payments and transaction hashes. Ask by ID or by name.
+<Badge text="read-only" /> Whether an invoice is paid, with payments and transaction hashes. Ask by ID or by name. Flags short
+payments ("received 75 of 100 USDC, so 25 USDC is still owed") and overpayments.
 
 | Input | Type | Required | Notes |
 |---|---|---|---|
@@ -55,14 +56,17 @@ With neither, the default (first) route is used. If more than one route matches,
 | `who` | string | one of these | Name or note it was created with; checks up to 5 matching invoices. |
 
 **Returns** `hasBeenPaid`, `status`, `requestAmount`, `invoiceCurrency`, `paymentCurrency`, `payments[]`, `txHash` and more.
+The text summary starts with `PAID`, `NOT PAID YET`, `PART-PAID` or `PAID (OVERPAID)`.
 
 ## list_invoices
 
 <Badge text="read-only" /> Invoices created with your credentials, newest first, with exact totals owed and paid per currency.
+Part-paid invoices count only what's still owed. Each returned request has a `balance` with `state` (`unpaid`,
+`partly_paid`, `paid`, `overpaid`), `asked`, `received`, `remaining` and `over`.
 
 | Input | Type | Required | Notes |
 |---|---|---|---|
-| `status` | `unpaid` · `paid` · `all` | no | Default `all`. |
+| `status` | `unpaid` · `paid` · `partly_paid` · `overpaid` · `all` | no | Default `all`. `unpaid` includes part-paid invoices. |
 | `period` | `this_month` · `last_month` · `last_30_days` · `this_year` | no | By creation date (UTC). |
 | `olderThanDays` | integer | no | e.g. `14` for "older than 2 weeks". |
 | `walletAddress` | address | no | Only invoices paid to this wallet. |

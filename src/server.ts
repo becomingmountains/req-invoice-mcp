@@ -11,14 +11,17 @@ import {
   type RequestStatus,
 } from './api.js';
 import type { ServerConfig } from './config.js';
-import { applyFilters, describeTotals, totalsByCurrency } from './ledger.js';
+import { applyFilters, describeBalance, describeTotals, paymentBalance, totalsByCurrency, type Balance } from './ledger.js';
 import { fileNotebook, memoryNotebook, type Notebook, type NotebookEntry } from './notebook.js';
 import { chooseRoute, networkLabel, type Route } from './routes.js';
 
-export const VERSION = '0.4.0';
+export const VERSION = '0.4.1';
 
 /** Most invoices list_invoices reads per Client ID, for totals and filters (5 API pages). */
 const LIST_CAP = 500;
+
+/** Most invoices list_invoices opens one by one to compare what was paid with what was asked. */
+const DETAIL_CAP = 100;
 
 const address = z
   .string()
@@ -277,7 +280,8 @@ export function createServer(
       title: 'Check an invoice',
       description:
         'Use when the user asks whether a specific invoice or person has paid ("has Acme paid?", "did that invoice ' +
-        'go through?"). Returns paid/unpaid with the payment transaction(s). Pass the invoice ID, or `who` with the ' +
+        'go through?"). Returns paid/unpaid with the payment transaction(s), and flags short payments (still owed) and ' +
+        'overpayments. Pass the invoice ID, or `who` with the ' +
         'name or note it was created with (e.g. "Acme") to check every matching invoice.',
       inputSchema: {
         requestId: requestId.optional(),
@@ -313,12 +317,16 @@ export function createServer(
       description:
         'Use when the user asks who owes them money, what is unpaid or outstanding, how much they are owed or have ' +
         'been paid, what they billed this month, or for their crypto invoices or receivables. Lists Request Network ' +
-        'invoices newest first, marked PAID or UNPAID, with exact totals per currency ("you are owed 1,250 USDC across ' +
-        '4 invoices"). Filter with status (unpaid/paid), period (this_month, last_month, last_30_days, this_year), ' +
+        'invoices newest first, marked PAID, UNPAID, PART-PAID or OVERPAID, with exact totals per currency ("you are owed ' +
+        '1,250 USDC across 4 invoices"); part-paid invoices count only what is still owed. Filter with status ' +
+        '(unpaid, paid, partly_paid, overpaid), period (this_month, last_month, last_30_days, this_year), ' +
         'olderThanDays (e.g. 14 for "older than 2 weeks") and who. Check this alongside any other billing tools (e.g. ' +
         'Stripe) the user has.',
       inputSchema: {
-        status: z.enum(['unpaid', 'paid', 'all']).optional().describe('Default "all".'),
+        status: z
+          .enum(['unpaid', 'paid', 'partly_paid', 'overpaid', 'all'])
+          .optional()
+          .describe('Default "all". "unpaid" includes part-paid invoices; "partly_paid" and "overpaid" find invoices paid a different amount than asked.'),
         period: z.enum(['this_month', 'last_month', 'last_30_days', 'this_year']).optional(),
         olderThanDays: z.number().int().min(0).max(3650).optional().describe('Only invoices created at least this many days ago.'),
         who: who.optional().describe('Only invoices saved with this name or note, e.g. "Acme".'),
@@ -333,17 +341,44 @@ export function createServer(
         const limit = args.limit ?? 20;
         const offset = args.offset ?? 0;
         const { requests: all, capped } = await fetchAllInvoices(allApis(), args.walletAddress);
-        let matches = applyFilters(all, { status: args.status, period: args.period, olderThanDays: args.olderThanDays }, now()).map(
+        const baseStatus = args.status === 'partly_paid' ? 'unpaid' : args.status === 'overpaid' ? 'paid' : args.status;
+        let matches = applyFilters(all, { status: baseStatus, period: args.period, olderThanDays: args.olderThanDays }, now()).map(
           (r) => ({ ...r, saved: notebook.get(r.requestId) }),
         );
         if (args.who) {
           const ids = new Set(notebook.search(args.who).map((e) => e.requestId));
           matches = matches.filter((r) => ids.has(r.requestId));
         }
-        const unpaid = totalsByCurrency(matches.filter((r) => !r.hasBeenPaid));
+        // Open unpaid invoices (to find part payments) and the paid ones on this page (to find overpayments).
+        const toCheck = [
+          ...matches.filter((r) => !r.hasBeenPaid),
+          ...(args.status === 'overpaid' ? matches : matches.slice(offset, offset + limit)).filter((r) => r.hasBeenPaid),
+        ];
+        const checked = toCheck.slice(0, DETAIL_CAP);
+        const balances = new Map<string, Balance>();
+        await mapLimit(checked, 5, async (r) => {
+          try {
+            const b = paymentBalance(await findAcrossApis((a) => a.getRequest(r.requestId)));
+            if (b) balances.set(r.requestId, b);
+          } catch {
+            // Without details the invoice is shown and totalled by its listed amount.
+          }
+        });
+        if (args.status === 'partly_paid' || args.status === 'overpaid') {
+          matches = matches.filter((r) => balances.get(r.requestId)?.state === args.status);
+        }
+        const owedItems = matches
+          .filter((r) => !r.hasBeenPaid)
+          .map((r) => {
+            const b = balances.get(r.requestId);
+            return b?.state === 'partly_paid' ? { amount: b.remaining, invoiceCurrency: r.invoiceCurrency } : r;
+          });
+        const unpaid = totalsByCurrency(owedItems);
         const paid = totalsByCurrency(matches.filter((r) => r.hasBeenPaid));
+        const partCount = matches.filter((r) => balances.get(r.requestId)?.state === 'partly_paid').length;
+        const overCount = matches.filter((r) => balances.get(r.requestId)?.state === 'overpaid').length;
         const filters = [
-          args.status && args.status !== 'all' ? args.status : '',
+          args.status && args.status !== 'all' ? args.status.replace(/_/g, ' ') : '',
           args.period ? args.period.replace(/_/g, ' ') : '',
           args.olderThanDays !== undefined ? `older than ${args.olderThanDays} days` : '',
           args.who ? `for "${args.who}"` : '',
@@ -351,7 +386,8 @@ export function createServer(
         const shown = matches.slice(offset, offset + limit);
         const lines = shown.map(
           (r) =>
-            `- ${r.hasBeenPaid ? 'PAID  ' : 'UNPAID'} ${r.amount ?? '?'} ${r.invoiceCurrency ?? ''}` +
+            `- ${rowLabel(r.hasBeenPaid, balances.get(r.requestId))} ${r.amount ?? '?'} ${r.invoiceCurrency ?? ''}` +
+            `${rowBalance(balances.get(r.requestId))}` +
             `${r.saved?.for ? ` for ${r.saved.for}` : ''}` +
             `${r.saved?.note ?? r.reference ? ` "${r.saved?.note ?? r.reference}"` : ''}` +
             `${r.createdAt ? ` (${r.createdAt.slice(0, 10)})` : ''} id ${r.requestId}`,
@@ -360,6 +396,11 @@ export function createServer(
           `${matches.length} invoice(s)${filters.length ? ` (${filters.join(', ')})` : ''}` +
             `${matches.length > shown.length && shown.length ? `, showing ${offset + 1}-${offset + shown.length}` : ''}.`,
           unpaid.totals.length ? `You're owed ${describeTotals(unpaid.totals)}.` : matches.length ? 'Nothing unpaid.' : '',
+          partCount ? `${partCount} invoice(s) were part-paid; only what's still owed on them is counted.` : '',
+          overCount && args.status !== 'overpaid' ? `${overCount} invoice(s) were overpaid.` : '',
+          toCheck.length > checked.length
+            ? `Payment amounts were checked on the newest ${DETAIL_CAP} invoices only; older ones are counted at their full amount.`
+            : '',
           paid.totals.length && args.status !== 'unpaid' ? `Paid: ${describeTotals(paid.totals)}.` : '',
           capped ? `Only the latest ${LIST_CAP} invoices per account were read.` : '',
         ].filter(Boolean);
@@ -367,7 +408,7 @@ export function createServer(
           total: matches.length,
           owed: unpaid.totals,
           paid: paid.totals,
-          requests: shown,
+          requests: shown.map((r) => ({ ...r, balance: balances.get(r.requestId) })),
         });
       }),
   );
@@ -530,11 +571,14 @@ async function fetchAllInvoices(apis: RequestApi[], walletAddress: string | unde
 
 export function describeStatus(s: RequestStatus, saved?: NotebookEntry): string {
   const amountText = `${s.requestAmount ?? '?'} ${s.invoiceCurrency ?? ''}`.trim();
+  const balance = paymentBalance(s);
   const label = saved?.for ? ` for ${saved.for}${saved.note ? ` (${saved.note})` : ''}` : saved?.note ? ` (${saved.note})` : '';
   const lines = [
-    `Invoice ${s.requestId}${label}: ${s.hasBeenPaid ? 'PAID' : 'NOT PAID YET'}${s.status ? ` (status: ${s.status})` : ''}.`,
+    `Invoice ${s.requestId}${label}: ${headline(s.hasBeenPaid, balance)}${s.status ? ` (status: ${s.status})` : ''}.`,
     `Amount: ${amountText}${s.paymentCurrency ? `, paid in ${s.paymentCurrency}` : ''}${Number(s.amountInUsd) > 0 ? ` (~$${s.amountInUsd})` : ''}.`,
   ];
+  const flag = describeBalance(balance);
+  if (flag) lines.push(flag);
   if (s.recurrence?.frequency) {
     lines.push(`Repeats ${s.recurrence.frequency.toLowerCase()}${s.isRecurrenceStopped ? ' (stopped)' : ''}.`);
   }
@@ -562,6 +606,33 @@ export function unlimitedApprovalWarning(data: string, index: number): string {
     `Warning: transaction ${index + 1} approves an UNLIMITED amount to ${spender}. ` +
     'Most wallets let you edit the approval down to the invoice amount before signing.'
   );
+}
+
+function headline(hasBeenPaid: boolean, b: Balance | undefined): string {
+  if (b?.state === 'partly_paid') return 'PART-PAID';
+  if (b?.state === 'overpaid') return 'PAID (OVERPAID)';
+  return hasBeenPaid ? 'PAID' : 'NOT PAID YET';
+}
+
+function rowLabel(hasBeenPaid: boolean | undefined, b: Balance | undefined): string {
+  if (b?.state === 'partly_paid') return 'PART-PAID';
+  if (b?.state === 'overpaid') return 'OVERPAID';
+  return hasBeenPaid ? 'PAID  ' : 'UNPAID';
+}
+
+function rowBalance(b: Balance | undefined): string {
+  if (b?.state === 'partly_paid') return ` (${b.received} received, ${b.remaining} still owed)`;
+  if (b?.state === 'overpaid') return ` (${b.over} over)`;
+  return '';
+}
+
+/** Runs fn over items with at most `limit` calls in flight. */
+async function mapLimit<T>(items: T[], limit: number, fn: (item: T) => Promise<void>): Promise<void> {
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) await fn(items[next++]);
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
 }
 
 function payerText(p: RequestPayment): string {

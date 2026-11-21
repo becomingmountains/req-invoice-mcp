@@ -99,3 +99,79 @@ export function describeTotals(totals: CurrencyTotal[]): string {
     .map((t) => `${t.total} ${t.currency} across ${t.count} invoice${t.count === 1 ? '' : 's'}`)
     .join(' and ');
 }
+
+export type PaymentState = 'unpaid' | 'partly_paid' | 'paid' | 'overpaid';
+
+export interface BalanceInput {
+  hasBeenPaid?: boolean;
+  requestAmount?: string | null;
+  invoiceCurrency?: string | null;
+  payments?: { amount?: string; currency?: string; paymentCurrency?: string; excessAmount?: string | null; excessCurrency?: string | null }[];
+  conversionBreakdown?: { paidAmount?: string; remainingAmount?: string } | null;
+}
+
+export interface Balance {
+  state: PaymentState;
+  currency: string;
+  asked: string;
+  /** Amount received toward the invoice, in the invoice currency. */
+  received?: string;
+  /** Still owed, when part-paid. */
+  remaining?: string;
+  /** Amount above what was asked, e.g. "10 USDC". */
+  over?: string;
+}
+
+/**
+ * Compares what was received with what was asked. Payment amounts are in the invoice currency.
+ * When a payment was converted from another currency, differences under 0.5% count as exact.
+ */
+export function paymentBalance(s: BalanceInput): Balance | undefined {
+  const asked = toScaled(s.requestAmount ?? undefined);
+  if (asked === undefined || asked === 0n) return undefined;
+  const currency = s.invoiceCurrency || '?';
+  const same = (c?: string | null) => !c || c.toLowerCase() === currency.toLowerCase();
+  const payments = s.payments ?? [];
+  const base = { currency, asked: formatScaled(asked) };
+
+  let received: bigint | undefined = toScaled(s.conversionBreakdown?.paidAmount);
+  if (received === undefined && payments.length) {
+    received = 0n;
+    for (const p of payments) {
+      const v = toScaled(p.amount);
+      if (v === undefined || !same(p.currency)) return { ...base, state: s.hasBeenPaid ? 'paid' : 'unpaid' };
+      received += v;
+    }
+  }
+  if (received === undefined || received === 0n) return { ...base, state: s.hasBeenPaid ? 'paid' : 'unpaid' };
+
+  const converted = payments.some((p) => p.paymentCurrency && !same(p.paymentCurrency));
+  const tolerance = converted ? asked / 200n : 0n;
+  const excess = payments
+    .map((p) => ({ v: toScaled(p.excessAmount ?? undefined), c: p.excessCurrency || currency }))
+    .filter((e): e is { v: bigint; c: string } => e.v !== undefined && e.v > 0n);
+
+  if (received > asked + tolerance) {
+    return { ...base, state: 'overpaid', received: formatScaled(received), over: `${formatScaled(received - asked)} ${currency}` };
+  }
+  if (excess.length) {
+    const over = excess.map((e) => `${formatScaled(e.v)} ${e.c}`).join(' and ');
+    return { ...base, state: 'overpaid', received: formatScaled(received), over };
+  }
+  if (!s.hasBeenPaid && received + tolerance < asked) {
+    const remaining = toScaled(s.conversionBreakdown?.remainingAmount) ?? asked - received;
+    return { ...base, state: 'partly_paid', received: formatScaled(received), remaining: formatScaled(remaining) };
+  }
+  return { ...base, state: s.hasBeenPaid ? 'paid' : 'unpaid', received: formatScaled(received) };
+}
+
+/** One line for check_invoice, or '' when the amount received matches. */
+export function describeBalance(b: Balance | undefined): string {
+  if (b?.state === 'partly_paid') {
+    return `Short payment: received ${b.received} of ${b.asked} ${b.currency}, so ${b.remaining} ${b.currency} is still owed.`;
+  }
+  if (b?.state === 'overpaid') {
+    return `Overpaid: received ${b.over} more than the ${b.asked} ${b.currency} asked. You may want to refund or credit it.`;
+  }
+  return '';
+}

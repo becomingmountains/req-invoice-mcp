@@ -29,8 +29,30 @@ Totals are exact, with no rounding, and cover every matching invoice, not just t
 | "in the last 30 days" / "this year" | `period: "last_30_days"` / `"this_year"` |
 | "older than 2 weeks" | `olderThanDays: 14` |
 | "for Acme" | `who: "Acme"` |
+| "who paid short?" | `status: "partly_paid"` |
+| "did anyone overpay?" | `status: "overpaid"` |
 
 They combine: *"What's still unpaid from more than two weeks ago?"*
+
+## Wrong amounts
+
+Payers sometimes send less or more than the invoice asked. Both are flagged.
+
+> Did Acme pay?
+
+```txt
+Invoice 01ed…: PART-PAID (status: created).
+Amount: 100 USDC.
+Short payment: received 75 of 100 USDC, so 25 USDC is still owed.
+```
+
+In `list_invoices`, a part-paid invoice shows as `PART-PAID 100 USDC (75 received, 25 still owed)`, and only the 25
+counts toward what you're owed. An overpaid one shows as `OVERPAID 50 USDC (5 USDC over)`, so you can refund or credit
+the difference.
+
+Payment amounts come from the invoice's payment history. If a payer paid in another currency (for example, ETH for a
+USD invoice), differences under 0.5% are treated as exact, since conversion rates move. To keep lists fast, payment amounts are checked on up to
+100 invoices per request; the summary says so when there are more.
 
 ## Chasing a late payer
 

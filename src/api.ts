@@ -42,6 +42,11 @@ export interface RequestPayment {
   payerEoaAddress?: string;
   timestamp?: string;
   paymentCurrency?: string;
+  /** Invoice currency the amount is counted in. */
+  currency?: string;
+  /** Amount delivered above what was applied to the invoice. */
+  excessAmount?: string | null;
+  excessCurrency?: string | null;
 }
 
 export interface RequestStatus {
@@ -60,6 +65,8 @@ export interface RequestStatus {
   recurrence?: { startDate?: string; frequency?: string } | null;
   isRecurrenceStopped?: boolean;
   originalRequestId?: string | null;
+  /** Present for part-paid invoices and invoices paid in several payments. */
+  conversionBreakdown?: { paidAmount?: string; remainingAmount?: string } | null;
 }
 
 export interface RequestListItem {
