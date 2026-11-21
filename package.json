@@ -1,7 +1,9 @@
 {
   "name": "req-invoice-mcp",
   "version": "0.4.1",
+  "mcpName": "io.github.becomingmountains/req-invoice-mcp",
   "description": "Unofficial MCP server that lets AI assistants create, share and track crypto invoices on Request Network. No wallet, no spending.",
+  "author": "becomingmountains",
   "type": "module",
   "bin": {
     "req-invoice-mcp": "dist/index.js"
@@ -14,7 +16,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "start": "node dist/index.js",
-    "prepare": "tsc"
+    "prepare": "tsc",
+    "prepublishOnly": "npm run typecheck && npm test"
   },
   "engines": {
     "node": ">=20"

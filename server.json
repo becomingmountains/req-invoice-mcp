@@ -1,0 +1,51 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.becomingmountains/req-invoice-mcp",
+  "title": "Request Network Invoices",
+  "description": "Create crypto invoices and payment links on Request Network, and track who has paid. No wallet.",
+  "repository": {
+    "url": "https://github.com/becomingmountains/req-invoice-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://becomingmountains.github.io/req-invoice-mcp/",
+  "version": "0.4.1",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "req-invoice-mcp",
+      "version": "0.4.1",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "REQUEST_CLIENT_ID",
+          "description": "Client ID from dashboard.request.network (or set REQUEST_API_KEY)",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "REQUEST_DESTINATION_ID",
+          "description": "Route ID that receives payment links, from the dashboard",
+          "isRequired": false
+        },
+        {
+          "name": "REQUEST_ROUTES",
+          "description": "Several Route IDs, comma separated, each optionally =CLIENT_ID",
+          "isRequired": false
+        },
+        {
+          "name": "REQUEST_PAYEE",
+          "description": "Default wallet that receives payments on custom invoices",
+          "isRequired": false
+        },
+        {
+          "name": "REQUEST_API_KEY",
+          "description": "Server API key, instead of a Client ID",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

@@ -9,7 +9,7 @@ An [MCP](https://modelcontextprotocol.io) server for [Request Network](https://r
 
 **It holds no wallet and can't spend money.** It creates and reads invoices only. Payers pay from their own wallet.
 
-![Demo: create a payment link, the payer pays, the assistant confirms it's paid. Real run on Sepolia testnet.](assets/demo.gif)
+![Demo: create a payment link, the payer pays, the assistant confirms it's paid. Real run on Sepolia testnet.](https://raw.githubusercontent.com/becomingmountains/req-invoice-mcp/main/assets/demo.gif)
 
 <sub>Real run on Sepolia testnet: [the payment transaction](https://sepolia.etherscan.io/tx/0x66d0e4cff82b1c6ba0a4670436908bbdd46ed273075364af5b3226e3565cc2f6).</sub>
 
@@ -41,7 +41,7 @@ An [MCP](https://modelcontextprotocol.io) server for [Request Network](https://r
   "mcpServers": {
     "req-invoice": {
       "command": "npx",
-      "args": ["-y", "github:becomingmountains/req-invoice-mcp"],
+      "args": ["-y", "req-invoice-mcp"],
       "env": {
         "REQUEST_CLIENT_ID": "your-client-id",
         "REQUEST_DESTINATION_ID": "0xYourWallet@eip155:1#ABCD1234:0xTokenAddress",
