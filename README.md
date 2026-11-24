@@ -1,5 +1,7 @@
 # req-invoice-mcp
 
+[![npm](https://img.shields.io/npm/v/req-invoice-mcp)](https://www.npmjs.com/package/req-invoice-mcp) [![req-invoice-mcp MCP server](https://glama.ai/mcp/servers/becomingmountains/req-invoice-mcp/badges/score.svg)](https://glama.ai/mcp/servers/becomingmountains/req-invoice-mcp)
+
 Let your AI assistant send crypto invoices and tell you when they're paid.
 
 An [MCP](https://modelcontextprotocol.io) server for [Request Network](https://request.network): any MCP-capable assistant (Cursor, VS Code, Windsurf, desktop AI apps, your own agent) can create invoices, share payment links and check payment status in plain language.
