@@ -1,6 +1,6 @@
 {
   "name": "req-invoice-mcp",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "mcpName": "io.github.becomingmountains/req-invoice-mcp",
   "description": "Unofficial MCP server that lets AI assistants create, share and track crypto invoices on Request Network. No wallet, no spending.",
   "author": "becomingmountains",

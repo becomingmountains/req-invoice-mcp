@@ -15,7 +15,7 @@ import { applyFilters, describeBalance, describeTotals, paymentBalance, totalsBy
 import { fileNotebook, memoryNotebook, type Notebook, type NotebookEntry } from './notebook.js';
 import { chooseRoute, networkLabel, type Route } from './routes.js';
 
-export const VERSION = '0.4.1';
+export const VERSION = '0.4.2';
 
 /** Most invoices list_invoices reads per Client ID, for totals and filters (5 API pages). */
 const LIST_CAP = 500;
@@ -132,11 +132,13 @@ export function createServer(
     {
       title: 'Create a payment link',
       description:
-        'Use when the user wants to bill, charge, invoice or request money from someone, or asks for a payment link. ' +
-        'Returns a link the payer opens to pay in their own wallet. Each receiving route set up in the Request Network ' +
+        'The default way to bill someone. Use when the user wants to bill, charge, invoice or request money from ' +
+        'someone, or asks for a payment link, unless one of the create_invoice cases below applies. Returns a link the ' +
+        'payer opens to pay from any wallet, in the token they hold. Each receiving route set up in the Request Network ' +
         'dashboard is one network and token; pass currency and/or network to pick one (see list_routes), or omit both ' +
         "to use the default route. The amount is in the chosen route's token. Pass `for` (who is billed) and `note` so " +
-        'the user can later ask about it by name. This is the easiest way to get paid.',
+        'the user can later ask about it by name. Use create_invoice instead only to bill in USD, to repeat the bill on ' +
+        'a schedule, to name the payer wallet or an invoice number, or when no route matches the network.',
       inputSchema: {
         amount,
         currency: z.string().trim().max(20).optional().describe('Token to be paid in, e.g. "USDC" or "USDT".'),
@@ -206,12 +208,14 @@ export function createServer(
     {
       title: 'Create an invoice',
       description:
-        'Use when the user wants to invoice someone in a specific token or network, bill in USD, or add an invoice ' +
-        'number or note. Creates an on-chain invoice (a "request") for a specific amount, currency and network. ' +
+        'Use instead of create_payment_link only when the user wants to: bill a USD amount paid in crypto; repeat the ' +
+        'bill on a schedule ("every month"); name the wallet expected to pay or an invoice number; or bill on a network ' +
+        'with no receiving route (see list_routes). Otherwise use create_payment_link. Creates an on-chain invoice (a ' +
+        '"request") for a specific amount, currency and network; it returns an invoice ID, not a payment link. ' +
         'paymentCurrency picks the token and network, e.g. "USDC-base", "USDC-mainnet", "USDC-arbitrum-one", "fUSDC-sepolia" (test USDC) ' +
         '(use find_currency to look IDs up). invoiceCurrency is what the amount is denominated in; it defaults to ' +
         'paymentCurrency, or use "USD" to bill a dollar amount paid in crypto. Use repeat for recurring billing ' +
-        '("bill Acme 500 USDC every month"). Returns the invoice ID.',
+        '("bill Acme 500 USDC every month").',
       inputSchema: {
         amount,
         paymentCurrency: currencyId,
